@@ -12,7 +12,7 @@ The code isn't published yet. It will live in this repository.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE).
 
 ---
 
@@ -24,4 +24,4 @@ Modu 是一个在浏览器里运行的“小手机”，用来和 AI 角色、AI
 
 **现状**：代码尚未公开，之后会放在这个仓库里。
 
-**许可证**：MIT，见 [LICENSE](LICENSE)。
+**许可证**：Apache License 2.0，见 [LICENSE](LICENSE)。
