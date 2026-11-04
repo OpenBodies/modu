@@ -1,0 +1,50 @@
+/* 一起听: styles for its own screen only. Colours come from the skin's tokens. */
+#s-app-music .a-music-now{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 18px 14px;text-align:center;min-width:0}
+#s-app-music .a-music-disc{width:150px;height:150px;border-radius:50%;background:var(--m-art) center/cover no-repeat;position:relative;margin-bottom:8px;box-shadow:0 6px 24px var(--m-shade)}
+#s-app-music .a-music-disc:after{content:"";position:absolute;inset:44px;border-radius:50%;background:var(--m-art-disc);box-shadow:inset 0 0 0 18px var(--m-art-ring)}
+#s-app-music .a-music-disc.a-music-has-cover:after{inset:62px;box-shadow:none}
+#s-app-music .a-music-spin{animation:a-music-turn 8s linear infinite}
+@keyframes a-music-turn{to{transform:rotate(360deg)}}
+#s-app-music .a-music-with{font-size:12px;color:var(--m-muted)}
+#s-app-music .a-music-title{font-size:18px;font-weight:600;color:var(--m-fg);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#s-app-music .a-music-sub{font-size:12.5px;color:var(--m-muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#s-app-music .a-music-lyric{display:flex;flex-direction:column;gap:2px;width:100%;margin-top:6px;min-height:3.9em;font-size:12.5px;line-height:1.3;color:var(--m-muted)}
+#s-app-music .a-music-lyric[hidden]{display:none}
+#s-app-music .a-music-lyric b{font-size:14.5px;font-weight:600;color:var(--m-fg);min-height:1.3em}
+#s-app-music .a-music-lyric span,#s-app-music .a-music-lyric b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:1.3em}
+#s-app-music #mBar{width:100%;margin-top:10px;accent-color:var(--m-accent)}
+#s-app-music .a-music-tt{display:flex;justify-content:space-between;width:100%;font-size:11px;color:var(--m-muted);font-variant-numeric:tabular-nums}
+#s-app-music .a-music-ctl{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:6px;color:var(--m-fg)}
+#s-app-music .a-music-ctl button{min-width:40px;min-height:40px;display:flex;align-items:center;justify-content:center}
+#s-app-music .a-music-ctl button[disabled]{opacity:.35}
+#s-app-music .a-music-play{width:58px;height:58px;border-radius:50%;background:var(--m-accent);color:var(--m-accent-fg)}
+#s-app-music .a-music-play .ic{width:26px;height:26px}
+#s-app-music .a-music-heart.on{color:var(--m-accent)}
+#s-app-music .a-music-heart.on .ic{fill:currentColor}
+#s-app-music .a-music-his{font-size:12px;color:var(--m-accent)}
+#s-app-music .a-music-his[hidden]{display:none}
+#s-app-music .a-music-two{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:stretch}
+#s-app-music .a-music-two .btn{margin:0}
+#s-app-music .a-music-lrcbtn{display:flex;align-items:center;gap:4px;padding:0 14px;border:1px solid var(--m-line);border-radius:999px;color:var(--m-fg);font-size:14px}
+#s-app-music .a-music-lrcbtn[disabled]{opacity:.4}
+#s-app-music .a-music-room{display:flex;flex-direction:column;gap:8px;padding:10px 12px;min-width:0}
+#s-app-music .a-music-strip{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;min-width:0}
+#s-app-music .a-music-line{display:flex;flex-direction:column;gap:2px;min-width:0;max-width:86%}
+#s-app-music .a-music-line small{font-size:11px;color:var(--m-muted)}
+#s-app-music .a-music-line p{margin:0;font-size:14.5px;line-height:1.55;color:var(--m-fg);background:var(--m-soft);border-radius:var(--m-radius);padding:7px 11px;white-space:pre-wrap;overflow-wrap:anywhere}
+#s-app-music .a-music-line.her{align-self:flex-end;align-items:flex-end}
+#s-app-music .a-music-line.her p{background:var(--m-accent);color:var(--m-accent-fg)}
+#s-app-music .a-music-wait p{color:var(--m-muted);background:transparent;padding:0}
+#s-app-music .a-music-say{display:flex;gap:8px}
+#s-app-music .a-music-say input{flex:1;min-width:0;font:inherit;font-size:16px;padding:8px 12px;border-radius:999px;border:1px solid var(--m-line);background:var(--m-bg);color:var(--m-fg)}
+#s-app-music .a-music-say button{flex:0 0 auto;padding:0 14px;border-radius:999px;background:var(--m-accent);color:var(--m-accent-fg);font-size:14px}
+#s-app-music .a-music-q{cursor:pointer}
+#s-app-music .a-music-q.now .a-music-qt{color:var(--m-accent);font-weight:600}
+#s-app-music .a-music-qt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#s-app-music .a-music-qt small{color:var(--m-muted);font-weight:400}
+#s-app-music .val em{font-style:normal;font-size:11px;margin-left:4px;color:var(--m-accent)}
+#s-app-music .a-music-drop{margin-left:8px;width:28px;height:28px;font-size:18px;line-height:1;color:var(--m-muted)}
+#s-app-music .a-music-empty{color:var(--m-muted)}
+/* the file box stays in the page but out of sight: some phone browsers (UC) ignore a tap passed to a
+   `hidden` file box, so 选一首歌 did nothing there */
+#s-app-music .a-music-file{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}

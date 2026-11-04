@@ -1,0 +1,45 @@
+# Modu 颜文字: the kaomoji he sends under his bubbles, keyed by the mood he writes with each reply.
+# Turn it on in 美化 → 表情 (颜文字, or 都要 for both the line sticker and the kaomoji).
+#
+# One line each: mood = kaomoji. The moods are fixed (core.js EMOTIONS):
+#   joy 开心 · sadness 难过 · anger 生气 · surprise 惊讶 · relief 放松 · neutral 平常
+# Add, change or delete lines freely; a mood can have any number. Reload the page to see the change.
+# The same reply always gets the same one (it is picked from the reply, not at random each time).
+# neutral: chat shows nothing for it, same as the line stickers; kept here for later.
+# Written for Modu by hand, not taken from another app's set.
+
+joy = (ˊᗜˋ)
+joy = ヽ(•‿•)ノ
+joy = (๑˃ᴗ˂)ﻭ
+joy = (*´▽`*)
+joy = ٩(ˊωˋ)و
+
+sadness = (｡•́︿•̀｡)
+sadness = (╥﹏╥)
+sadness = (._.)
+sadness = (´•︵•`)
+sadness = (・へ・)
+
+anger = (｀へ´)
+anger = (¬_¬)
+anger = (＃｀д´)
+anger = ( ˘･з･)
+anger = (╯°□°)╯
+
+surprise = (⊙_⊙)
+surprise = Σ(°ロ°)
+surprise = (°o°)
+surprise = (・□・;)
+surprise = w(ﾟДﾟ)w
+
+relief = (´-ω-`)
+relief = (￣▽￣)~
+relief = (*ˊᵕˋ*)
+relief = ε-(´∀`*)
+relief = (´｡• ᵕ •｡`)
+
+neutral = (・_・)
+neutral = ( ˙-˙ )
+neutral = (￣ー￣)
+neutral = (・ω・)
+neutral = ( ._. )

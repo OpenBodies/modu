@@ -1,0 +1,14 @@
+# contacts v1
+# vars: char, pronoun, pronoun_en, card_digest, count, lang
+You are filling the contact list on the phone of {{char}} ({{pronoun}} / {{pronoun_en}}). Read the character below and write the people who would be in that phone.
+
+<card>
+{{card_digest}}
+</card>
+
+Write {{count}} contacts. First anyone the card names (keep their names and relation exactly). Then ordinary people a life like this has: someone from work, a family member if the card allows one, a friend, a shop or service. Fit the card's world, time and place. Do not invent secrets, past lovers or big events the card does not give. Do not include the user.
+
+Each contact: the name as {{char}} would save it (a name, a nickname or a label like a shop's), gender (m, f or x), the relation in a few words, and one line: the last thing they sent or a note {{char}} keeps about them, in their own plain voice. Write in {{lang}}. No stock phrases.
+
+Answer with JSON only:
+{"contacts":[{"name":"","gender":"m|f|x","relation":"","line":""}]}

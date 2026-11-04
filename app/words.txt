@@ -1,0 +1,1499 @@
+# Modu 小手机 — every line of text the app shows.
+#
+# How to edit: change only the text AFTER the "=" sign. Leave the name before "=" alone.
+# Lines starting with # are notes and are not shown. Save the file, then reload the page.
+#   {name}   becomes his name (for example Char)
+#   {n}      becomes a number
+#   {source} becomes where he came from (c.ai or 酒馆)
+#   {folder} becomes the folder's name
+#   {from} {to} become two dates
+#   {why}    becomes the reasons, for example 2 条无法读取
+#   {code}   becomes the lock screen's first code (DEFAULT in lock.js)
+#   \n       starts a new line
+# Not in this file: what he says (the model writes it), his memories (the model writes them,
+# she can edit them in the app), and the dates and times (the phone's own format).
+
+# ===== 搬家 (the first screen) =====
+import.title = 导入联系人信息
+import.lead = 目前支持酒馆格式和 c.ai 导出，ChatGPT 和 DeepSeek 官端导入正在设计中。聊天记录和记忆只保存在你自己的设备上。
+import.drop = 选择或拖入文件：角色卡（png）、聊天记录（jsonl）；可选：记忆（md / txt）、世界书（json），以及角色卡文件夹里的作息（params）、联系人、正则、预设和人称文件（json）
+import.drop.more = 继续拖入新文件
+import.drop.both = 角色卡（png）和聊天记录（jsonl）
+import.drop.card = 角色卡（png）
+import.drop.card.ok = 角色卡 ✓
+import.drop.chat = 聊天记录（jsonl）
+import.drop.chat.ok = 聊天记录 ✓
+import.drop.lore.ok = 世界书 ✓
+import.drop.memory.ok = 记忆 ✓
+import.source.cai = c.ai
+import.source.st = 酒馆 SillyTavern
+import.source.gpt = ChatGPT
+import.source.ds = DeepSeek
+import.card.noname = 没有名字
+# what 搬家 understood, one line each
+import.card.card = 角色卡 ✓
+import.card.chat = 聊天记录 ✓ {n} 条
+import.card.range = ，{from} 到 {to}
+import.card.skipped = 跳过 {n} 条：{why}
+import.skip.broken = {n} 条无法读取
+import.skip.notmessage = {n} 条不是聊天消息
+import.card.undated = {n} 条没有时间，显示为「时间不详」
+import.card.future = {n} 条的时间晚于今天，无法使用，显示为「时间不详」
+import.card.lore = 世界书「{name}」✓ {n} 条，放进他的设定
+import.card.memory = 记忆 ✓ {n} 条
+import.card.memory.dated = ，其中 {n} 条带日期
+import.card.from = 来自 {source}
+import.card.from.sample = 来自 示例
+import.start = 开始聊天
+import.open = 打开已保存的角色文件夹
+import.error.read = 无法读取该文档：
+import.error.save = 未保存：
+import.toast.pick = 请选择一个文件夹，用来保存他的聊天记录和记忆
+import.toast.noopen = 请在电脑上用 Chrome 或 Edge 打开
+import.toast.notopened = 无法打开
+import.demo.fail = 示例未载入（请用 http 打开这个页面）
+# c.ai 官方 app 的导出: 解压后的 message.json、character.json 和头像图片
+import.caiapp.how = c.ai 官方导出：先解压，再选择 data 里的 message.json、character.json，和 images 里的头像
+# 搬家 → 酒馆 SillyTavern 的说明（点「酒馆 SillyTavern」时显示）
+import.st.how = 酒馆：选择角色卡（png）和聊天记录（jsonl），可以一起选。预设、世界书和正则也可以一起带来
+import.zip = 这是压缩包，无法直接打开。请先解压，再选择里面的文件
+import.zip.locked = 这是加密的压缩包，无法直接打开。请先在手机或电脑上解压（密码一般是你 c.ai 账号的邮箱），再选择里面的 message.json、character.json 和头像图片
+import.drop.caiapp.ok = c.ai 聊天记录 ✓
+import.drop.caiapp.chat = 还需要 message.json
+import.drop.picture.ok = 头像 ✓
+import.caiapp.chats = 选择你和他的那段聊天
+import.caiapp.chat.row = {n} 条，{from} 到 {to}
+import.caiapp.chat.one = {n} 条，{from}
+import.caiapp.chat.undated = {n} 条，时间不详
+import.caiapp.who = 他是谁
+import.caiapp.who.type = 或者输入他的名字
+import.caiapp.pic = 他的头像
+import.caiapp.guess = c.ai 的导出没有标明每句话是谁说的，已按顺序推测
+import.caiapp.swap = 说反了？点击对调
+import.caiapp.swapped = 已对调
+import.caiapp.user = user.json 没有导入（里面是你的账号信息）
+import.caiapp.need.chat = 请选择一段聊天
+import.caiapp.need.name = 请选择或输入他的名字
+
+# ===== 锁屏 (lock screen) =====
+lock.hint = 上滑或点击解锁
+# 锁屏密码: the keypad after a tap or swipe. lock.code.first shows until she sets her own code.
+lock.code.ask = 输入密码
+lock.code.wrong = 密码错误，请重试
+lock.code.first = 初始密码 {code}，可在设置中修改
+# 忘记密码, under the keypad once she has a code of her own. The sheet says what the lock is (it only makes Modu
+# open like a phone) and that nothing is lost; 恢复成 the first code needs a long press (about 1.5 s), or two presses (a keyboard, a screen reader)
+lock.forgot = 忘记密码
+lock.forgot.title = 忘记密码了？
+lock.forgot.text = 这个密码只是让小手机像真手机一样打开，聊天记录和记忆没有因此加密，恢复密码也不会丢失任何东西。恢复后密码变回初始密码 {code}，可以再到设置里修改。
+lock.forgot.hold = 按住 恢复成 {code}
+lock.forgot.again = 再按一次，恢复成 {code}
+lock.forgot.how = 按住约 1.5 秒，按钮填满就恢复
+lock.forgot.done = 已恢复成初始密码 {code}
+# his presence, read from his "body" (the lock screen, the home clock, the chat's top bar)
+presence.here = 他在
+presence.asleep = 他睡着了
+presence.busy = 他在忙
+# her last message did not reach him
+presence.away = 暂时联系不上
+
+# ===== 桌面 (home screen) =====
+app.chat = 聊天
+app.memory = 记忆
+app.beauty = 美化
+app.voice = 声音
+app.moments = 朋友圈
+app.call = 来电
+app.game = 游戏
+app.stickers = 表情包
+app.avatar = 虚拟形象
+app.proactive = 主动
+app.settings = 设置
+app.more = 更多
+app.body = 形象
+app.move = 搬家
+app.video = 视频通话
+# page 2 of the home screen: the apps still being built
+app.diary = 日记
+app.mail = 信箱
+app.album = 相册
+app.music = 一起听
+app.shop = 购物
+app.food = 外卖
+app.wallet = 钱包
+app.home = 家园
+app.theme = 主题商城
+app.calendar = 日历
+app.todo = 清单
+app.weather = 天气
+app.peek = 查手机
+# an app opened for one person (the page draws these): his name in the app's header, and who to open it for
+apps.with = 和 {name}
+apps.with.switch = 换一个人
+apps.pick.title = 和谁一起？
+apps.pick.now = 正在一起
+greet.morning = 早上好
+greet.noon = 中午好
+greet.afternoon = 下午好
+greet.evening = 晚上好
+greet.night = 夜深了
+home.days = 在一起第 {n} 天
+# the 他 widget when nobody is in 聊天 (everyone deleted)
+home.nobody = 还没有联系人
+home.nobody.sub = 点击添加联系人
+# 一起听: the widget looks like a player; it plays nothing yet
+music.label = 一起听
+music.title = 午后的光
+music.by = {name} 分享给你
+music.soon = 一起听开发中
+tag.soon = 开发中
+tag.beta = 内测中
+cal.title = 日程
+cal.empty = 点击添加
+cal.when1 = 时间，比如 周日
+cal.what = 要做的事
+cal.when2 = 时间
+cal.today = 今天
+cal.tomorrow = 明天
+cal.add = 添加
+todo.title = 清单
+todo.left = 还剩 {n} 项
+todo.empty = 点击添加
+todo.new = 要做的事
+todo.add = 添加
+# demo mode only: what her to-do list shows before she types her own
+todo.demo1 = 给小米买猫粮
+todo.demo2 = 周日烤面包
+todo.demo3 = 还书
+# demo mode only: what her calendar shows before she types her own
+cal.demo.when1 = 周日
+cal.demo.what1 = 和他一起烤面包
+cal.demo.when2 = 下周三
+cal.demo.what2 = 书店
+
+# ===== 聊天 (the list of everyone, then one chat) =====
+chats.title = 聊天
+chats.add = 添加
+chats.empty = 还没有联系人\n点击「添加联系人」，导入联系人信息
+chats.add.row = 添加联系人
+# 删除联系人: a long press on a contact, or 聊天 ⋯ → 删除联系人. {name} = who is being deleted.
+chats.delete = 删除联系人
+chats.delete.title = 删除{name}？
+chats.delete.text.phone = {name}的聊天记录和记忆会从这台设备上删除，无法恢复。想留着的话，请先在设置里导出备份。
+chats.delete.text.folder = 只从列表中移除。{name}的资料还在电脑上，之后可以在搬家里接回来。
+chats.delete.text.demo = 这是示例联系人，删除后不会保存。
+chats.delete.done = 已删除
+chats.delete.fail = 无法删除：
+chat.send = 发送
+chat.placeholder = 发消息
+chat.voice.on = 已开启消息朗读
+chat.voice.off = 已关闭消息朗读
+chat.mic = 语音输入开发中
+chat.plus = 图片发送开发中
+chat.photo = [照片]
+chat.menu.memory = 记忆
+chat.menu.derive = 整理记忆
+chat.menu.call = 视频通话
+chat.menu.proactive = 他会主动找你
+chat.menu.inner = 心声
+chat.menu.delete = 删除联系人
+# 聊天设置 (聊天 ⋯, or tap his picture or name at the top of the chat)
+chat.menu.settings = 聊天设置
+chat.set.title = 聊天设置
+chat.set.his = {name}的头像
+chat.set.mine = 我的头像
+chat.set.name = 我的名字
+chat.set.name.none = 未设置
+chat.set.name.hint = {name}会用这个名字称呼你。不填的话，就用聊天记录里原来的名字；没有原来的名字，就不叫名字。
+chat.set.name.placeholder = 你的名字
+chat.set.pron = 我的人称
+chat.set.bg = 聊天背景
+chat.set.bg.default = 默认
+chat.set.bg.photo = 从相册选
+chat.set.bg.custom = 自定义
+chat.set.done = 已更换
+chat.set.saved = 已保存
+chat.set.fail = 没能保存，再试一次
+chat.inner = 心声
+chat.inner.tap = 点开看他的心声
+chat.error = 消息发送失败：
+# under a message of hers that did not reach him (kept after a reload)
+chat.unsent = 消息发送失败
+chat.stamp.undated = 时间不详
+
+# ===== 记忆 =====
+memory.title = 记忆
+memory.empty = 还没有记忆。\n每天聊过的，第二天你来聊天时会自己记下来；也可以点右上角的「整理」。
+memory.pen = 整理
+memory.hint = 可以点击修改记忆条目
+memory.range = {from} 到 {to}
+memory.add = 新加一条
+memory.derive = 从聊天记录里整理
+memory.toast.saved = 已修改
+memory.toast.deleted = 已删除
+memory.toast.working = 正在整理…
+memory.toast.done = 整理了 {n} 条
+memory.toast.none = 没有新条目
+memory.toast.failed = 整理失败：
+# shown at the top of 记忆 until 整理 is done
+memory.job.working = 正在整理…
+memory.job.one = 正在读你们的聊天记录
+memory.job.progress = 已读 {done}/{total} 段聊天，整理出 {n} 条
+# 新加一条: 这条记忆里的「我」是谁
+memory.add.who = 这条里的「我」是：
+memory.add.who.mine = 我自己
+memory.add.who.his = {name}
+memory.add.who.need = 请选择「我」是谁
+memory.who.mine = 「我」是我
+memory.who.his = 「我」是{name}
+# 排序和搜索
+memory.search = 搜索记忆
+memory.sort.time = 按时间
+memory.sort.kind = 按类别
+memory.group.pinned = 置顶
+memory.group.summary = 总结
+memory.group.his = {name}记得的
+memory.group.hers = 我记下的
+memory.group.imported = 以前带过来的
+memory.group.month = {y}年{m}月
+memory.group.nodate = 没有日期
+memory.found = 找到 {n} 条
+memory.found.none = 没有找到
+memory.tag.hers = 我记下的
+memory.pin = 置顶
+memory.unpin = 取消置顶
+memory.toast.pinned = 已置顶
+memory.toast.unpinned = 已取消置顶
+
+# ===== 虚拟形象 =====
+avatar.title = 虚拟形象
+avatar.heading = 他可以有属于自己的形象，也可以有属于自己的设备
+avatar.text = 虚拟形象，桌面机器人，都是他。功能内测中。
+
+# ===== 形象 (his look: 虚拟形象 + 关联设备) =====
+body.title = 形象
+body.tab.avatar = 虚拟形象
+body.tab.devices = 关联设备
+body.heading = 他可以有自己的形象
+body.text = 视频通话时，他就在那里，表情跟着心情变。
+# developers only (设置 → 关于 → 版本, 7 taps): the VRM file
+body.text.dev = 选一个 VRM 形象文件，视频通话时就是他的样子。没有的话，通话里显示他的头像。
+body.heading.vrm = 这是他的样子
+body.text.vrm = 他的表情跟着心情变，说话时嘴会动。
+body.call = 视频通话
+body.model = 形象文件
+body.model.none = 未选择
+body.model.done = 已更换
+body.voice = 通话时朗读他的话
+# developers only
+body.foot = 形象文件只存在当前浏览器里。
+dev.avatar = 虚拟形象
+dev.avatar.sub = 在这台设备上
+dev.on = 已连接
+dev.off = 未连接
+dev.stackchan = StackChan 桌面机器人
+dev.stackchan.sub = 通过设备桥连接。在下面填写设备桥地址。
+dev.stackchan.on = 他的表情会同步到机器人上
+dev.bridge.only = 设备桥已连接
+dev.badge = 电子吧唧
+dev.badge.sub = 戴在身上的小屏幕，显示他的表情
+dev.bridge.addr = 地址
+dev.bridge.none = 未连接
+dev.foot = 设备桥是电脑上运行的一个小程序，把他的表情和话传给机器人。
+
+# ===== 视频通话 =====
+call.camoff = 摄像头已关闭
+call.say = 说点什么
+call.mic = 说话
+call.keys = 打字
+call.speaker = 声音
+call.end = 挂断
+# developers only: the note under his picture in a call with no VRM
+call.noface = 还没有形象文件，可以在“形象”里选择
+call.noface.fail = 形象没有载入，先显示头像
+call.listening = 正在听…
+call.mic.none = 这台设备不支持语音输入，可以打字
+call.mic.fail = 没有听清，请再说一次
+# his mood, shown next to his name in the call and in 形象
+mood.joy = 开心
+mood.sadness = 难过
+mood.anger = 生气
+mood.surprise = 惊讶
+mood.relief = 放松
+mood.neutral = 平静
+# his mood in the chat and next to his name: a phone emoji each (leave one empty for none)
+mood.joy.emoji = 😊
+mood.sadness.emoji = 😢
+mood.anger.emoji = 😠
+mood.surprise.emoji = 😮
+mood.relief.emoji = 😌
+
+# ===== 美化 =====
+beauty.title = 美化
+beauty.skin = 皮肤
+beauty.skin.modu = Modu
+beauty.skin.rouguang = Modu 柔光
+beauty.skin.mo = 墨
+beauty.skin.more = 更多开发中
+beauty.skin.already = 现在用的就是「{name}」
+beauty.skin.done = 已换成「{name}」
+beauty.skin.done.css = 已换成「{name}」。你的自定义 CSS 还开着，会盖在皮肤上面
+beauty.night = 夜间模式
+beauty.night.auto = 跟随系统
+beauty.night.on = 开
+beauty.night.off = 关
+beauty.wall = 壁纸
+beauty.wall.default = 默认
+beauty.wall.room = 他的房间
+beauty.wall.photo = 从相册选
+beauty.wall.custom = 自定义
+beauty.bubble = 气泡
+beauty.bubble.round = 圆角
+beauty.bubble.square = 方角
+beauty.font = 字体
+beauty.font.system = 系统默认
+beauty.font.serif = 宋体
+beauty.sticker = 表情
+beauty.sticker.line = 线条贴纸
+beauty.sticker.kaomoji = 颜文字
+beauty.sticker.both = 都要
+# his actions in the chat ("他看了眼手机"): a quiet line with no bubble; off = not shown, and he is asked not to write them
+beauty.actions = 他的动作
+beauty.avatar = 头像
+beauty.avatar.done = 已更换
+beauty.pack = 导入美化包
+# 自定义 CSS (look.js): only works inside the phone
+beauty.own = 自定义
+beauty.css = 自定义 CSS
+beauty.css.on = 已开启
+beauty.css.off = 已关闭
+beauty.css.none = 未添加
+beauty.css.hint = 粘贴别人分享的 CSS。只会改小手机里面的样子，外部链接、全屏覆盖和页面背景会被忽略。
+beauty.css.placeholder = 在这里粘贴 CSS
+beauty.css.apply = 应用
+beauty.css.turnoff = 关闭自定义 CSS
+beauty.css.turnon = 开启自定义 CSS
+beauty.css.clear = 清空
+beauty.css.done = 已应用
+beauty.css.done.some = 已应用，忽略了 {n} 处
+beauty.css.fixed = 已应用。{name}的字看不清，已换成看得清的颜色
+beauty.css.part.ta = 他的气泡
+beauty.css.part.me = 我的气泡
+beauty.css.part.card = 记忆卡片
+beauty.css.part.list = 列表
+beauty.css.cleared = 已清空
+beauty.css.nothing = 没有可用的样式
+beauty.css.brief = 复制主题说明
+beauty.css.brief.sub = 发给 AI 写主题
+beauty.css.brief.done = 已复制，可以粘贴给 AI
+beauty.css.brief.fail = 无法自动复制，请手动全选复制
+beauty.css.brief.frame = 通用
+beauty.css.brief.lock = 锁屏
+beauty.css.brief.home = 桌面
+beauty.css.brief.chat = 聊天
+beauty.css.brief.memory = 记忆
+beauty.css.brief.lists = 设置和美化的列表
+beauty.css.brief.sheets = 弹窗和提示
+beauty.css.brief.text = 请帮我给「Modu 小手机」写一份主题 CSS，我会把它粘贴到小手机的「美化 → 自定义 CSS」里。\n\n规则：\n1. 只写 CSS。不要 @import，不要外部链接；图片只能用 data: 开头的图片，或者不用图片。\n2. 颜色、字体、圆角优先改下面这些变量，写在 :root 里。夜间的样子写在 :root[data-night="on"] 里。\n3. 不要改 html 和 body，不要用 position: fixed，不要改元素的位置和大小。\n4. 气泡：.b.me 是我发的，.b.ta 是他发的。\n\n变量：\n{tokens}\n\n可以用的类名：\n{classes}\n\n开关（在 :root 上）：data-night="on" 或 "off"，data-skin="rouguang" 或 "modu"，data-bubble="round" 或 "square"，data-font="system" 或 "serif"。\n\n例子：\n:root { --m-me: #c9a46a; --m-me-fg: #ffffff; }\n:root[data-night="on"] { --m-bg: #1d1b19; }\n.b.ta { border-radius: 18px 18px 18px 4px; }\n\n我想要的风格是：
+# 我的外观: whole-look snapshots (look.js)
+beauty.saved = 我的外观
+beauty.saved.save = 保存当前外观
+beauty.saved.none = 还没有保存
+beauty.saved.unnamed = 未命名
+beauty.saved.name = 外观名字
+beauty.saved.name.default = 外观 {n}
+beauty.saved.current = 正在使用
+beauty.saved.when = 保存于 {from}
+beauty.saved.use = 使用这个外观
+beauty.saved.used = 已切换
+beauty.saved.rename = 重命名
+beauty.saved.done = 已保存
+beauty.saved.deleted = 已删除
+beauty.saved.full = 无法保存，空间满了。可以先删掉几个，或换一张小一点的壁纸
+
+# ===== 声音 =====
+voice.title = 声音
+voice.read = 朗读他的消息
+voice.voice = 声音
+voice.voice.default = 系统默认
+# when this device has no voice that is not a woman's, nothing is read until she picks one
+voice.nomale = 没有男声，请选一个
+voice.nomale.toast = 这台设备上没有男声，可以在「声音」里选一个
+voice.rate = 语速
+voice.rate.slow = 慢
+voice.rate.normal = 正常
+voice.rate.fast = 快
+voice.try = 试听
+voice.try.default = 你好，很高兴能和你一起说话。或者就这样，一起度过一段平静的时光。
+voice.foot = 现在用的是这台设备自带的声音。声音定制功能还在制作中。
+
+# ===== 设置 =====
+settings.title = 设置
+settings.model = 模型
+# developers only
+settings.local = 本机 Claude Code（仅开发用）
+settings.local.sub = 不需要 API key，使用这台电脑上已登录的 Claude Code
+settings.custom = 其他模型服务
+settings.custom.sub = 选一个模型服务，填上 API key
+settings.endpoint = 地址
+settings.modelname = 模型
+settings.key = API key
+settings.key.empty = 未填写
+# 本机's model server asks for the token its window shows each time it starts
+settings.token = 令牌
+settings.token.empty = 模型服务窗口里显示的那一串
+settings.test = 测试连接
+settings.test.working = 正在连接…
+settings.test.ok = 已连接
+settings.test.fail = 连接失败
+settings.test.card.working = 正在检查角色卡…
+settings.test.card.ok = 已连接，角色卡完整
+settings.test.card.bad = 已连接，角色卡不完整
+settings.test.card.cut = 模型只收到了角色卡的开头，后面的内容没有送到。请检查模型服务。
+settings.test.card.name = 模型没有说出{name}的名字，角色卡可能没有送到。
+settings.remember = 在这台设备上记住设置
+settings.key.foot = API key 只存在这台设备上，只发给你选的模型服务。
+# the model service by name; under it, one line on where to get a key (model.how.<id>)
+model.service = 服务
+model.svc.pick = 选模型服务
+model.svc.openrouter = OpenRouter
+model.svc.deepseek = DeepSeek
+model.svc.siliconflow = 硅基流动 SiliconFlow
+model.svc.own = 自己填
+model.how.openrouter = 在 openrouter.ai 登录，到 Keys 页新建一个 key。用付费模型要先在 Credits 页充值
+model.how.deepseek = 在 platform.deepseek.com 登录，到 API keys 页新建一个 key。要先充值才能用
+model.how.siliconflow = 在 cloud.siliconflow.cn 登录，到 API 密钥页新建一个 key
+model.how.own = 填模型服务给你的地址（一般以 /v1 结尾）和 API key
+# 拉取模型: the service's own list, tap one; typing the name stays possible
+model.name.empty = 拉取后点一个，或者自己填
+model.fetch = 拉取模型
+model.fetch.working = 正在拉取…
+model.fetch.title = 选一个模型
+model.fetch.search = 搜索模型名
+model.fetch.count = 共 {n} 个
+model.fetch.more = 共 {n} 个，先列出 {shown} 个，搜一搜能找到别的
+model.fetch.none = 没有找到这个名字
+model.fetch.price = 价格是每百万 token 多少美元：输入 / 输出
+model.fetch.free = 免费
+model.fetch.empty = 模型服务没有给出模型，可以自己填模型名
+model.fetch.picked = 已选好：{model}
+model.test.ok = 已连上，{model} 回答了
+# what went wrong, one plain line each (model.err.<code>), kept under 测试连接 / 拉取模型 until the next tap
+model.err.model = 模型名可能不对。点「拉取模型」挑一个，或者照服务上的写法填（OpenRouter 的模型名像 公司名/模型名）
+model.err.long = 要发的内容太长，这个模型装不下。换一个能读更长内容的模型
+model.err.key = API key 不对。看看有没有复制完整，或者新建一个 key
+model.err.denied = 模型服务拒绝了：这个 key 可能不能用这个模型
+model.err.credit = 模型服务那边没有余额了，或者这个 key 的额度用完了。先看账户里有没有钱（key 上设的额度只是上限，账户里要先充值），再看 key 的额度
+model.err.policy = OpenRouter 的隐私设置不让用这个模型（免费模型常见）。到 openrouter.ai 的 Settings → Privacy，打开允许免费模型的选项再试
+model.err.address = 地址不对。选上面的服务，或者看看地址有没有填错
+model.err.nolist = 这个服务没有给出模型列表，可以自己填模型名
+model.err.busy = 太频繁了，模型服务在限流。等一会儿再试，或者换一个模型（免费模型限得很紧）
+model.err.server = 模型服务那边出了问题，等一会儿再试
+model.err.net = 连不上模型服务。看看网络，或者地址对不对
+model.err.thought = 模型只想了没说话。换个模型或者再试一次
+model.err.filtered = 模型服务把这次回复拦下了，换一个模型试试
+model.err.empty = 模型服务的回复里没有文字。换个模型或者再试一次
+model.err.noaddress = 还没有选模型服务
+model.err.nomodel = 还没有填模型名。点「拉取模型」挑一个
+model.err.other = 模型服务说不行，原因在下面的原文里
+model.copy = 复制原文
+model.copied = 已复制
+model.key.cleared = 换了服务，API key 已清空：每个服务的 key 不一样，请填这个服务的 key
+settings.pronoun = 人称
+settings.pronoun.he = 他
+settings.pronoun.she = 她
+settings.pronoun.they = TA
+settings.chatlog = 聊天记录
+settings.chatlog.folder = 文件夹「{folder}」
+settings.chatlog.none = 未保存
+settings.chatlog.phone = 保存在这台设备上
+settings.chatlog.demo = 示例，不保存
+settings.memory = 记忆
+settings.memory.count = {n} 条
+settings.switch = 所有联系人
+settings.memory.foot = 记忆是从聊天记录里整理出来的，会放在同一个文件夹的 memory 里，一条一个文件，用记事本也能打开。
+settings.backup = 备份
+settings.export = 导出备份
+settings.export.done = 备份已保存：{file}。是一个压缩包，在「下载」文件夹里
+settings.export.saved = 已保存
+settings.export.fail = 无法导出：
+settings.import = 导入备份
+settings.import.done = 已导入「{name}」
+settings.import.fail = 无法导入：
+settings.import.demo = 示例模式下不能导入
+# backup words. {file} the backup's name. Safari on an iPhone asks before it downloads, so there it is "ready", not "saved"
+settings.export.ready = 备份已准备好：{file}。手机问的时候选「下载」，它会放在「文件」的「下载项」里
+settings.export.err.other = 没能做成备份，请再试一次
+settings.import.same.title = 已经有「{name}」了
+settings.import.same.text = {name}已经在聊天里了，和这个备份是同一个。
+settings.import.same.open = 打开{name}
+settings.import.same.again = 再导入一个
+settings.import.err.zip-broken = 备份文件坏了（可能没有下载完整），请重新导出一份
+settings.import.err.no-companion = 这个文件里没有角色
+settings.import.err.storage-full = 手机的存储空间不够了，没有存上。清理一些空间后再试一次
+settings.import.err.storage-lost = 没有存上，请再试一次
+settings.import.err.unfinished = 这个备份没有导完，请再试一次
+settings.import.err.other = 这个文件打不开，可能不是小手机的备份
+# said once after she moves her own companion in, when the phone may clear him ({name} his name)
+keep.ios.title = 让{name}一直留在小手机里
+keep.ios.text = 在 Safari 里，太久没打开的网页会被清掉，{name}也会不见。想一直留着他：先点下面的「导出备份」；再在 Safari 里点「分享」→「添加到主屏幕」；从主屏幕打开小手机，在 设置 → 备份 里导入这份备份。主屏幕上的小手机是另一个，不会被这样清掉，但 Safari 里的他不会自己过去。用无痕浏览时，关掉页面他就不见了。
+keep.other = 记得在 设置 → 备份 里导出一份，换手机或清理手机后还能把{name}找回来
+boot.open.fail = 没能打开{name}：{why}
+settings.backup.foot = 导出是一个 zip 文件：人设、聊天记录、记忆、头像都在里面，不含 API key 和设置。手机上可以存到「文件」里，换手机或清了数据后再导入；电脑上解压就是角色的文件夹。
+settings.advanced = 高级
+settings.bridge = 设备桥
+settings.bridge.connecting = 正在连接
+settings.bridge.on = 已连接
+settings.bridge.retry = 连接断开，5 秒后重连
+settings.bridge.bad = 地址有误
+settings.bridge.ask = 连接设备桥？
+settings.bridge.ask.text = 链接里带了一个不在这台电脑上的设备桥地址。允许后，聊天内容会发到这个地址。
+settings.bridge.allow = 允许连接
+settings.window = 上下文读取消息数
+# 开发者选项 (developers only; 设置 → 关于 → 版本, 7 taps turn it on or off)
+settings.dev.face = 脸（开发用）
+settings.dev.off = 关闭开发者选项
+settings.dev.on = 已打开开发者选项
+settings.dev.offed = 已关闭开发者选项
+settings.dev.left = 再点 {n} 次打开开发者选项
+settings.dev.left.off = 再点 {n} 次关闭开发者选项
+settings.about = 关于 Modu
+settings.about.version = 版本
+# {v} = the build version (index.html <meta name="modu-version">)
+settings.version = Modu 小手机 {v}
+settings.safe = 安全模式
+# 关于: how his things are made and kept, said once, here, and nowhere in his world. {name} = him, {v} = the version
+about.row = 关于小手机
+about.title = 关于 Modu 小手机
+about.him = 他
+about.words = {name}的话、朋友圈、日记和回信，都是 AI 模型按{name}的角色卡、记忆和你们最近的聊天写的。
+about.kept = 这些都保存在{name}的文件夹里（手机上是这台设备里），导出备份时一起带走。你加的照片也一样，只在这台设备上。
+about.peek = 查手机是一个小游戏：{name}的聊天、朋友圈、日记这些是你们真的有过的，只能看，不会改动；他和别人的聊天、备忘和搜索是模型按{name}的设定写的，不是真的手机。关于你的事，只写记忆和聊天里有的；没有依据的会去掉。
+about.money = 钱包、购物和外卖用的是小手机里的零钱，不是真钱。
+about.model = 聊天时，你们的聊天和{name}的角色卡会发给你在「模型」里选的模型服务。
+about.version = 版本 {v}
+# 设置 → 放到手机桌面: how to put 小手机 on the phone's home screen so it opens like an app (no address bar).
+# One text for the phone she is on: iPhone (Safari), Android in Chrome, another app on Android (Huawei's own, QQ, WeChat):
+# use Chrome there; HarmonyOS NEXT (no Chrome there): Huawei's own app.
+install.row = 放到手机桌面
+install.title = 把小手机放到手机桌面
+install.ios = 1. 用 Safari 打开小手机（在 QQ、微信里打开的，先点右上角「…」→「在 Safari 中打开」）。\n2. 点屏幕下方的「分享」按钮（方框和向上的箭头）；下方没有的话，点右下角的「⋯」→「分享」；iPad 上「分享」在屏幕上方。\n3. 往下找到「添加到主屏幕」。如果看到「作为网页 App 打开」，保持打开，再点「添加」。\n4. 以后从桌面上的「Modu 小手机」打开：全屏，没有地址栏，像手机里的 app 一样。\n\n桌面上的小手机和 Safari 里的是分开的两个：已经在 Safari 里和他聊过的话，先在 设置 → 备份 里「导出备份」，再到桌面上的小手机里「导入备份」。
+install.android = 1. 用 Chrome 打开小手机。\n2. 点右上角的「⋮」，选「添加到主屏幕」或「安装应用」，再点「安装」或「添加」。\n3. 以后从桌面上的「Modu 小手机」打开：全屏，没有地址栏，像手机里的 app 一样。\n\n华为、荣耀等手机：如果桌面上没有出现图标，到手机的「设置」→「应用」→「应用管理」→ Chrome →「权限」，打开「创建桌面快捷方式」，再添加一次。
+install.other = 用手机自带的上网软件、QQ 或微信添加到桌面，打开时常常还会带着地址栏。\n\n1. 先装好 Chrome（华为手机可以在「应用市场」里搜 Chrome，或从 Chrome 官网下载安装包）。\n2. 把小手机的网址复制到 Chrome 里打开，点右上角的「⋮」→「添加到主屏幕」或「安装应用」。\n3. 以后从桌面上的「Modu 小手机」打开。\n\n这里和 Chrome 里的小手机是分开的两个：已经在这里和他聊过的话，先在 设置 → 备份 里「导出备份」，再到 Chrome 里的小手机「导入备份」。
+install.harmony = 1. 在手机自带的上网软件里打开小手机。\n2. 点菜单（屏幕下方的「≡」或右上角的「⋮」），选「添加到桌面」或「添加至桌面」。\n3. 以后从桌面上的「Modu 小手机」打开。\n\n如果从桌面打开时还带着地址栏，请在内测群里告诉我们手机型号和系统版本（手机的「设置」→「关于手机」）。
+# 锁屏密码: cosmetic, like a phone's; say plainly that nothing is encrypted
+settings.lock = 锁屏密码
+settings.lock.on = 打开时输入密码
+settings.lock.change = 修改密码
+settings.lock.foot = 打开小手机时需要输入密码，和手机锁屏一样。这只是锁屏，聊天记录和记忆没有因此加密。
+settings.lock.new = 请输入 6 位数字的新密码，再输入一次确认。
+settings.lock.code1 = 新密码
+settings.lock.code2 = 再输入一次
+settings.lock.bad = 请输入 6 位数字
+settings.lock.mismatch = 两次输入不一致
+settings.lock.done = 已修改密码
+settings.lock.turned.on = 已开启锁屏密码
+settings.lock.turned.off = 已关闭锁屏密码
+safe.title = 安全模式
+safe.text = 这次打开没有使用保存的外观和自定义 CSS，页面是默认的样子。点「恢复默认外观」会清除保存的外观，并关闭自定义 CSS（内容保留，可以在美化里改好再开启）；声音设置不变。
+safe.reset = 恢复默认外观
+safe.leave = 不恢复，退出安全模式
+safe.stay = 先这样看看
+safe.enter.text = 外观出问题、页面显示不正常时用：这次打开不使用保存的外观和自定义 CSS，可以选择恢复默认外观。也可以在地址后面加 ?safe=1，或者连续点 5 下顶部的时间。
+safe.enter = 进入安全模式
+
+# ===== 还在做的 app (the small card that opens when tapped) =====
+soon.moments.title = 朋友圈
+soon.moments.text = 他会发朋友圈，你可以点赞、评论。
+soon.call.title = 来电
+soon.call.text = 他会给你打电话，你也可以打给他。
+soon.game.title = 游戏
+soon.game.text = 两个人一起玩的小游戏。
+soon.stickers.title = 表情包
+soon.stickers.text = 他会发表情包，你也可以存你喜欢的发给他。
+soon.proactive.title = 主动
+soon.proactive.text = 你没来找他的时候，他也会先发消息给你。
+soon.more.title = 更多
+soon.more.text = 更多功能开发中，敬请期待。
+soon.pack.title = 导入美化包
+soon.pack.text = 别人做好的皮肤、壁纸、气泡，一次装好。
+soon.diary.title = 日记
+soon.diary.text = 他会写日记，你可以翻看，也可以写给他看。
+soon.mail.title = 信箱
+soon.mail.text = 慢一点的信，他写给你，你写给他。
+soon.album.title = 相册
+soon.album.text = 你们的照片和截图，放在一起。
+soon.music.title = 一起听
+soon.music.text = 一起听歌，他会说说他喜欢的那一段。
+soon.shop.title = 购物
+soon.shop.text = 给他挑东西，他也会给你挑。
+soon.food.title = 外卖
+soon.food.text = 他帮你点一份晚饭。
+soon.wallet.title = 钱包
+soon.wallet.text = 他的小金库，和你们一起攒的钱。
+soon.home.title = 家园
+soon.home.text = 他的房间，可以一起布置。
+soon.theme.title = 主题商城
+soon.theme.text = 更多皮肤、壁纸和图标。
+soon.calendar.title = 日历
+soon.calendar.text = 完整的日历。现在可以先用桌面上的日历小组件。
+soon.todo.title = 清单
+soon.todo.text = 完整的清单。现在可以先用桌面上的清单小组件。
+soon.weather.title = 天气
+soon.weather.text = 他会看着天气提醒你带伞。
+soon.peek.title = 查手机
+soon.peek.text = 看看他的手机里都有什么。
+
+# the 开发中 page, for what is not finished yet (outside developer mode): 形象, 视频通话, 游戏, 信箱
+soon.page.head = 这个功能还在开发中
+soon.page.body.title = 形象
+soon.page.body = 以后{name}会有自己的样子，能看见、会动，表情跟着心情变。
+soon.page.call.title = 视频通话
+soon.page.call = 以后可以和{name}视频通话：听见{name}的声音，看见{name}的样子。
+soon.page.call.go = 先去聊天
+soon.page.game.title = 游戏
+soon.page.game = 猜拳、真心话，两个人一起玩的小游戏。
+soon.page.game.go = 先下一盘五子棋
+soon.page.mail.title = 信箱
+soon.page.mail = 以后{name}会给你写真正的信：信纸、墨迹，慢慢寄到你手里。
+soon.page.mail.kept = 你们的信都还在，开发好了就能看到。
+
+# ===== app: mail =====
+# 信箱 (apps/mail): slow letters
+app.mail.write = 写信
+app.mail.empty = 还没有信。\n点右上角的笔，给{name}写一封信。\n{name}会写回信，过一会儿送到。
+app.mail.me = 我
+app.mail.to = 给{name}
+app.mail.from = {name}的回信
+app.mail.placeholder = 慢慢写……
+app.mail.send = 寄出
+app.mail.sent = 已寄出
+app.mail.blank = 信还是空的
+app.mail.writing = {name}在写回信
+app.mail.eta = 大约 {n} 分钟后送到
+app.mail.eta.soon = 马上就到
+app.mail.failed = 回信没有寄到
+app.mail.retry = 再试一次
+# no countdown: only that she is waiting for his letter, and when hers went; {when} = 10月28日 21:05
+app.mail.waiting = 在等{name}的回信
+app.mail.waiting.sub = 你的信 {when} 寄出
+# when his letter comes (the notice, or the system notification if she allowed them)
+app.mail.arrived = 收到{name}的回信
+# his reply could not be written yet (the model was out of reach); it is tried again by itself
+app.mail.held = {name}的回信还没到
+app.mail.held.sub = 暂时联系不上{name}，过一会儿会再试
+app.mail.held.stopped = 试了几次都没写成，想再试就点「再试一次」
+app.mail.trying = 正在再试……
+app.mail.new = 新
+app.mail.answer = 回信
+# her letter not sent yet, kept at the top of the list
+app.mail.draft = 草稿
+
+# ===== shared =====
+ok = 确认
+save = 保存
+done = 完成
+cancel = 取消
+delete = 删除
+
+# ===== app: calendar (日历, the full app behind the 日程 widget) =====
+app.calendar.month = {y}年{m}月
+app.calendar.day = {m}月{d}日
+app.calendar.week = 日 一 二 三 四 五 六
+app.calendar.weekdays = 周日 周一 周二 周三 周四 周五 周六
+app.calendar.none = 这天还没有安排
+app.calendar.upcoming = 接下来
+app.calendar.upcoming.none = 还没有安排，点上面的日子再添加
+app.calendar.added = 已添加
+# a plan's time, or 全天
+app.calendar.time = 时间
+app.calendar.allday = 全天
+# a plan's start and (if she adds one) its end
+app.calendar.start = 开始
+app.calendar.end = 结束
+app.calendar.end.add = 加结束时间
+app.calendar.end.none = 不要结束时间
+app.calendar.end.dropped = 已添加。结束时间要在开始之后的同一天，这次没有记结束时间
+# her calendar is hers; 告诉他 shows him one plan
+app.calendar.tell = 告诉{him}
+app.calendar.told = 已告诉
+app.calendar.told.toast = 已告诉{name}
+
+# ===== app: todo (清单, the full list behind the 清单 widget) =====
+app.todo.empty = 还没有要做的事，在上面添加
+app.todo.clear = 清除已完成（{n}）
+app.todo.cleared = 已清除
+# her list is hers; 告诉他 shows him one task
+app.todo.tell = 告诉{him}
+app.todo.told = 已告诉
+app.todo.told.toast = 已告诉{name}
+
+# ===== app: diary (日记: his own diary, written by him in the evening) =====
+app.diary.day = {m}月{d}日
+app.diary.empty = {name}还没有写日记。
+app.diary.late = 次日 {t}
+
+# ===== app: album (相册: pictures you add, kept with him) =====
+app.album.add = 添加照片
+app.album.empty = 还没有照片，点这里添加
+app.album.added = 已添加 {n} 张
+app.album.bad = 有一个文件不是图片，已跳过
+app.album.day = {m}月{d}日
+app.album.delete = 删除这张
+app.album.deleted = 已删除
+app.album.foot = 共 {n} 张
+app.album.his = {name}发来的
+
+# ===== app: moments (朋友圈: his posts and yours, likes and comments) =====
+app.moments.write = 发朋友圈
+app.moments.mine = 这一刻的想法…
+app.moments.publish = 发表
+app.moments.notsaved = 无法保存，再试一次
+app.moments.empty = {name}还没有发过朋友圈
+app.moments.like = 赞
+app.moments.liked = 已赞
+app.moments.comment = 评论
+app.moments.placeholder = 写评论…
+app.moments.send = 发送
+app.moments.you = 你
+app.moments.replyto = 回复
+app.moments.now = 刚刚
+app.moments.min = {n} 分钟前
+app.moments.hour = {n} 小时前
+app.moments.yesterday = 昨天 {t}
+app.moments.day = {m}月{d}日
+
+# ===== app: wallet =====
+# 钱包: play money only (said once, in 设置 → 关于). {name} = him, {amount} = an amount like 52.00 or ¥52.00, {note} = what she wrote
+app.wallet.balance = 零钱
+app.wallet.redpacket = 发红包
+app.wallet.transfer = 转账
+app.wallet.topup = 加零钱
+app.wallet.ledger = 明细
+app.wallet.foot = 红包和转账会出现在聊天里，他会收下或退回。退回的钱会回到零钱。
+app.wallet.left = 零钱 {amount}
+app.wallet.amount = 金额（元）
+app.wallet.redpacket.lead = 发给{name}的红包，最多 200 元。
+app.wallet.redpacket.note = 恭喜发财，大吉大利
+app.wallet.redpacket.go = 塞钱进红包
+app.wallet.transfer.lead = 转账给{name}。
+app.wallet.transfer.note = 添加转账说明
+app.wallet.transfer.go = 转账
+app.wallet.transfer.to = 转账给{name}
+app.wallet.chat.redpacket = [红包] ¥{amount} {note}
+app.wallet.chat.transfer = [转账] ¥{amount} {note}
+app.wallet.card.redpacket = 红包
+app.wallet.card.transfer = 转账
+app.wallet.row.start = 初始零钱
+app.wallet.row.topup = 加零钱
+app.wallet.row.redpacket = 给{name}的红包
+app.wallet.row.redpacket.in = {name}给你的红包
+app.wallet.row.transfer = 转账给{name}
+app.wallet.row.transfer.in = {name}给你的转账
+app.wallet.row.other = 其他
+app.wallet.state.sent = 等他领取
+app.wallet.state.accepted = 已领取
+app.wallet.state.returned = 已退回
+app.wallet.state.refunded = 已退款
+app.wallet.state.in.sent = 待领取
+app.wallet.state.in.accepted = 已领取
+app.wallet.state.in.returned = 已退回
+app.wallet.again = 再问他一次
+app.wallet.toast.amount = 请填写金额
+app.wallet.toast.max = 红包最多 {amount}
+app.wallet.toast.short = 零钱不够
+app.wallet.toast.fail = 无法发送
+app.wallet.toast.topup = 已加 500 元零钱
+app.wallet.toast.noanswer = 他暂时没有回应，可以在钱包里再问一次
+# her one wallet, his own wallet, money on a schedule, 亲属卡, 发送成功, 模拟炒股 (a toy, 游戏币 only)
+app.wallet.tab.me = 我的
+app.wallet.tab.his = {name}的钱包
+app.wallet.tab.play = 模拟炒股
+app.wallet.row.moved = 从和{name}的钱包转入
+app.wallet.row.salary = 工资
+app.wallet.row.weekly = 零花钱
+app.wallet.row.interest = 零钱通收益
+app.wallet.row.save = 转入零钱通
+app.wallet.row.unsave = 从零钱通转出
+app.wallet.row.kin = {name}用了你的亲属卡
+app.wallet.row.cardpay = {note}（{name}的亲属卡）
+app.wallet.sent = 发送成功
+app.wallet.sent.redpacket = 红包已发给{name}
+app.wallet.sent.transfer = 已转账给{name}
+app.wallet.sent.chat = 去聊天看看
+app.wallet.plan = 收入
+app.wallet.plan.short = 收入
+app.wallet.plan.lead = 钱会按时到账，不用每次自己加。
+app.wallet.plan.salary = 每月工资
+app.wallet.plan.day = 每月几号
+app.wallet.plan.weekly = 每周零花钱
+app.wallet.plan.weekday = 每周哪天
+app.wallet.plan.week = 周{d}
+app.wallet.plan.line.salary = 每月{d}日 工资 {amount}
+app.wallet.plan.line.weekly = 每周{d} 零花钱 {amount}
+app.wallet.plan.none = 没有定期收入
+app.wallet.bill = 账单
+app.wallet.bill.title = {y}年{m}月账单
+app.wallet.bill.in = 收入
+app.wallet.bill.out = 支出
+app.wallet.bill.none = 这个月没有记录
+app.wallet.bill.prev = 上个月
+app.wallet.bill.next = 下个月
+app.wallet.cat.redpacket = 红包
+app.wallet.cat.transfer = 转账
+app.wallet.cat.shop = 购物
+app.wallet.cat.food = 外卖
+app.wallet.cat.salary = 工资
+app.wallet.cat.weekly = 零花钱
+app.wallet.cat.interest = 零钱通收益
+app.wallet.cat.moved = 从旧钱包转入
+app.wallet.cat.card = 亲属卡代付
+app.wallet.cat.kin = 他用了你的亲属卡
+app.wallet.cat.start = 初始零钱
+app.wallet.cat.topup = 加零钱
+app.wallet.cat.order = 订单
+app.wallet.cat.gift = 礼物
+app.wallet.cat.other = 其他
+app.wallet.save.title = 零钱通
+app.wallet.save.in = 转入
+app.wallet.save.out = 转出
+app.wallet.save.rate = 年化 {r}% · 每天约 {day}，每月1日到账
+app.wallet.save.left = 零钱通 {amount}
+app.wallet.kin = 亲属卡
+app.wallet.kin.from = {name}给你的亲属卡
+app.wallet.kin.to = 你给{name}的亲属卡
+app.wallet.kin.used = 本月已用 {used} / 额度 {limit}
+app.wallet.kin.stop = 停用
+app.wallet.kin.ask = 请{name}给你开亲属卡
+app.wallet.kin.ask.lead = 每月想要多少额度？他会自己决定开不开。
+app.wallet.kin.ask.go = 问问他
+app.wallet.kin.give = 给{name}开亲属卡
+app.wallet.kin.give.lead = 每月额度多少？他用它花的是你的零钱。
+app.wallet.kin.give.go = 开通
+app.wallet.toast.kin = 已开通亲属卡
+app.wallet.toast.kin.yes = {name}给你开了亲属卡
+app.wallet.toast.kin.no = {name}这次没有开
+app.wallet.toast.kin.stop = 已停用
+app.wallet.toast.limit = 超过本月额度
+app.wallet.toast.saved = 已保存
+app.wallet.his.none = 还没有打开联系人
+app.wallet.his.balance = {name}的零钱
+app.wallet.his.salary = 每月{d}日 工资 {amount}
+app.wallet.his.bill = 他的账单
+app.wallet.his.foot = 这是{name}自己的钱包，只能看。
+app.wallet.his.kin.out = 他给你的亲属卡
+app.wallet.his.kin.in = 你给他的亲属卡
+app.wallet.his.kin.limit = 每月 {limit}
+app.wallet.his.row.start = 初始零钱
+app.wallet.his.row.salary = 工资
+app.wallet.his.row.redpacket = 她发的红包
+app.wallet.his.row.transfer = 她的转账
+app.wallet.his.row.kinpay = 她用亲属卡买了 {note}
+app.wallet.his.row.kinuse = 用她的亲属卡买了 {note}
+app.wallet.his.row.gift = 送她的礼物
+app.wallet.his.row.order = 她送的「{note}」
+# something he bought himself on his own day (外卖, 购物)
+app.wallet.his.row.own = 买了「{note}」
+app.wallet.play.badge = 模拟 · 玩具
+app.wallet.play.toy = 公司都是编的，用的是游戏币，和零钱分开，不能换成零钱。
+app.wallet.play.coins = 游戏币
+app.wallet.play.value = 总资产 {v} 游戏币
+app.wallet.play.list = 模拟行情（每小时变一次）
+app.wallet.play.price = 现价 {p} 游戏币
+app.wallet.play.have = 持有 {n} 股
+app.wallet.play.n = 股数
+app.wallet.play.buy = 买入
+app.wallet.play.sell = 卖出
+app.wallet.play.foot = 只是好玩：涨跌是随机的，不会影响零钱、红包或购物。
+app.wallet.play.toast.n = 请填写股数
+app.wallet.play.toast.bought = 买入 {n} 股{name}
+app.wallet.play.toast.sold = 卖出 {n} 股{name}
+app.wallet.play.toast.short = 游戏币不够
+app.wallet.play.toast.shares = 没有这么多股
+
+# ===== app: shop =====
+# 购物: play money only, paid from 钱包's 零钱. {name} = him, {item} = a thing, {amount} = like 129.00
+app.shop.lead = 小手机里的商店，用钱包里的零钱付。
+app.shop.pick = 让{name}挑一件送我
+app.shop.pick.sub = 他会看着挑，也可能不送
+app.shop.orders = 我的订单
+app.shop.foot = 送他的东西要等快递，送到了他就知道，也就成了他的。找他代付，付不付由他。
+app.shop.buy.him = 送给{name}
+app.shop.buy.me = 给自己买
+app.shop.buy.pay = 找{name}代付
+app.shop.for.him = 送给{name}
+app.shop.for.me = 给自己买的
+app.shop.for.pay = {name}代付
+app.shop.card = 购物
+app.shop.card.fromhim = {name}送你的
+app.shop.state.asking = 等他回复
+app.shop.state.noanswer = 他还没回
+app.shop.state.declined = 他没有代付
+app.shop.state.short = 他的零钱不够
+app.shop.state.sent = 待收下
+app.shop.state.accepted = 已收下
+app.shop.accept = 收下
+app.shop.again = 再问他一次
+app.shop.order = 订单详情
+app.shop.reply = {name}说
+app.shop.eta = 预计 {time} 送到
+app.shop.arrived = 「{item}」已签收
+app.shop.track.placed = 已下单
+app.shop.track.shipped = 已发货
+app.shop.track.transit = 运输中
+app.shop.track.out = 派送中
+app.shop.track.delivered = 已签收
+app.shop.likes = {name}可能喜欢
+app.shop.likes.wait = 他在想…
+app.shop.likes.again = 再看看
+app.shop.likes.today = 今天的已经看过了，明天再来
+# when he has nothing to say: the 他可能喜欢 list. Each line: 名字 | 一句 | 价格（元）
+app.shop.like.1 = 皮手套 | 骑车的时候手不冷 | 159
+app.shop.like.2 = 机械键盘 | 敲起来声音很好听 | 399
+app.shop.like.3 = 一盒好茶 | 晚上加班泡一杯 | 128
+app.shop.like.4 = 胶片相机 | 想多拍几张你 | 680
+app.shop.things = {name}的东西
+app.shop.things.sub = 你送他的，送到了的都在这儿
+app.shop.things.empty = 还没有。送他的东西送到以后，会在这里。
+app.shop.things.at = {time} 送到
+app.shop.picking = {name}在挑…
+app.shop.picked.none = 这次他没有挑。
+app.shop.picked.view = 看看订单
+app.shop.toast.nowallet = 需要先有钱包
+app.shop.toast.fail = 无法下单
+app.shop.toast.noanswer = 他暂时没有回应
+app.shop.toast.accepted = 已收下
+app.shop.item.scarf = 羊毛围巾
+app.shop.item.scarf.line = 燕麦色，很软，冬天围着刚好
+app.shop.item.candle = 香薰蜡烛
+app.shop.item.candle.line = 雪松和橙皮的味道，睡前点一会儿
+app.shop.item.vinyl = 黑胶唱片
+app.shop.item.vinyl.line = 一张老爵士，放着做饭也好听
+app.shop.item.beans = 手冲咖啡豆
+app.shop.item.beans.line = 浅烘，有一点花香
+app.shop.item.bear = 毛绒小熊
+app.shop.item.bear.line = 抱着刚好的大小
+app.shop.item.pen = 钢笔
+app.shop.item.pen.line = 写字很顺，适合写信
+app.shop.item.flowers = 一束花
+app.shop.item.flowers.line = 今天店里新到的，颜色随机
+app.shop.item.book = 一本小说
+app.shop.item.book.line = 店员推荐，周末看完正好
+
+# ===== app: food =====
+# 外卖: play money only, paid from 钱包's 零钱. {name} = him, {item} = a dish, {amount} = like 32.00
+app.food.lead = 小手机里的外卖，用钱包里的零钱付。
+app.food.pick = 让{name}给我点一份
+app.food.pick.sub = 他会看着点，也可能不点
+app.food.orders = 我的订单
+app.food.foot = 点给他的外卖要等骑手，送到了他就知道。找他代付，付不付由他。
+app.food.buy.him = 给{name}点
+app.food.buy.me = 给自己点
+app.food.buy.pay = 找{name}代付
+app.food.for.him = 点给{name}的
+app.food.for.me = 给自己点的
+app.food.for.pay = {name}代付
+app.food.card = 外卖
+app.food.card.fromhim = {name}给你点的
+app.food.state.asking = 等他回复
+app.food.state.noanswer = 他还没回
+app.food.state.declined = 他没有代付
+app.food.state.short = 他的零钱不够
+app.food.state.sent = 待收下
+app.food.state.accepted = 已收下
+app.food.accept = 收下
+app.food.again = 再问他一次
+app.food.order = 订单详情
+app.food.reply = {name}说
+app.food.eta = 预计 {time} 送达
+app.food.arrived = 「{item}」已送达
+app.food.track.placed = 已下单
+app.food.track.accepted = 商家已接单
+app.food.track.picked = 骑手已取餐
+app.food.track.riding = 骑手配送中
+app.food.track.delivered = 已送达
+app.food.likes = {name}可能爱吃
+app.food.likes.wait = 他在想…
+app.food.likes.again = 再看看
+app.food.likes.today = 今天的已经看过了，明天再来
+# when he has nothing to say: the 他可能爱吃 list. Each line: 名字 | 一句 | 价格（元）
+app.food.like.1 = 烤鸭卷饼 | 好久没吃了 | 38
+app.food.like.2 = 冰美式 | 下午犯困的时候来一杯 | 22
+app.food.like.3 = 酸菜鱼 | 辣一点才过瘾 | 58
+app.food.like.4 = 生煎包 | 底要煎得脆 | 18
+app.food.things = 给{name}点过的
+app.food.things.sub = 你点给他的，送到了的都在这儿
+app.food.things.empty = 还没有。点给他的送到以后，会在这里。
+app.food.things.at = {time} 送到
+app.food.picking = {name}在挑…
+app.food.picked.none = 这次他没有点。
+app.food.picked.view = 看看订单
+app.food.toast.nowallet = 需要先有钱包
+app.food.toast.fail = 无法下单
+app.food.toast.noanswer = 他暂时没有回应
+app.food.toast.accepted = 已收下
+app.food.item.noodles = 牛肉面
+app.food.item.noodles.line = 汤是熬了一下午的
+app.food.item.eggrice = 番茄炒蛋饭
+app.food.item.eggrice.line = 家里的味道
+app.food.item.congee = 皮蛋瘦肉粥
+app.food.item.congee.line = 胃不舒服的时候喝
+app.food.item.claypot = 煲仔饭
+app.food.item.claypot.line = 锅巴很香
+app.food.item.sushi = 寿司拼盘
+app.food.item.sushi.line = 十二贯，两个人刚好
+app.food.item.malatang = 麻辣烫
+app.food.item.malatang.line = 微辣，多放青菜
+app.food.item.milktea = 奶茶
+app.food.item.milktea.line = 少糖，去冰
+app.food.item.cake = 草莓蛋糕
+app.food.item.cake.line = 一小块，不用等到生日
+
+# ===== app: game =====
+# 小游戏. {name} = him; {her} {his} = a hand; {result} = who won; {q} = a question; {inner} = his 心声
+app.game.rps = 猜拳
+app.game.rps.lead = {name}已经出好了，看不到你的。你出什么？
+app.game.hand.rock = 石头
+app.game.hand.scissors = 剪刀
+app.game.hand.paper = 布
+app.game.result.her = 你赢了
+app.game.result.him = 他赢了
+app.game.result.draw = 平局
+app.game.score = 你赢 {her} 次 · 他赢 {him} 次 · 平局 {draw} 次
+app.game.truth = 真心话
+app.game.truth.ask = 问{name}一个问题
+app.game.truth.him = 让{name}问我
+app.game.truth.lead = 他要说真话。他回答时的心声，点一下就能看到。
+app.game.truth.placeholder = 你想知道什么
+app.game.truth.go = 问他
+app.game.foot = 离开游戏后，聊天里会留一条记录。猜拳时他先出，看不到你出什么。
+app.game.card.hands = 你出{her}，他出{his}
+app.game.card.inner = 心声：{inner}
+app.game.card.hisq = 他问你的真心话
+app.game.chat.rps = [猜拳] 我出{her}，你出{his}，{result}
+app.game.chat.truth = [真心话] {q}
+app.game.toast.noanswer = 他暂时没有回应
+app.game.chat.result.her = 我赢了
+app.game.chat.result.him = 你赢了
+app.game.chat.result.draw = 平局
+app.game.thinking = {name}正在想…
+app.game.again = 再来一局
+app.game.inner = 心声
+app.game.inner.tap = 点击查看心声
+app.game.truth.yourq = 你问
+app.game.truth.youra = 你答
+app.game.truth.more = 再问一个
+app.game.truth.answer = 回答
+app.game.truth.answer.placeholder = 写下你的回答
+app.game.truth.again = 让他再问一个
+# the neutral grey line at the end of a visit (not her voice, not his). {name} = him
+app.game.chat.visit = [游戏] 刚才和{name}玩了{what}
+app.game.chat.visit.rps = 猜拳{n}局（你赢{her}局，{name}赢{him}局，平{draw}局）
+app.game.chat.visit.truth = 真心话{n}轮
+app.game.chat.visit.and = 、
+app.game.card.visit.rps = 猜拳{n}局
+app.game.card.visit.truth = 真心话{n}轮
+app.game.card.visit.score = 你赢{her} · 他赢{him} · 平局{draw}
+# his chat's ··· (contactActions)
+app.game.with = 一起玩
+
+# ===== app: gomoku =====
+# 五子棋 (a new game, one folder). {name} = him; {stone} = 黑棋 / 白棋; {n} = which game; {m} = moves
+app.gomoku = 五子棋
+app.gomoku.with = 下五子棋
+app.gomoku.black = 黑棋
+app.gomoku.white = 白棋
+app.gomoku.yours = 轮到你了，你执{stone}
+app.gomoku.thinking = {name}在想下哪儿…
+app.gomoku.result.her = 你赢了，连成了五子
+app.gomoku.result.him = {name}赢了
+app.gomoku.result.draw = 和棋，棋盘下满了
+app.gomoku.result.resign = 你认输了，{name}赢了
+app.gomoku.score = 第{n}局 · 你赢{her} · {name}赢{him}
+app.gomoku.strip.empty = {name}下棋时说的话会在这里
+app.gomoku.resign = 认输
+app.gomoku.again = 再来一局
+app.gomoku.inner = 心声
+app.gomoku.inner.tap = 点击查看心声
+app.gomoku.toast.noanswer = 他暂时没有回应，这一手先替他下了
+app.gomoku.foot = 先连成五子的赢，每局轮流先下。离开后，聊天里会留一条记录。
+app.gomoku.chat = [五子棋] 刚才和{name}下了{what}
+app.gomoku.chat.games = {n}局（你赢{her}局，{name}赢{him}局，和{draw}局）
+app.gomoku.chat.open = 一局没下完的（{m}手）
+app.gomoku.chat.and = ，还有
+
+# ===== app: music =====
+# 一起听: a room for her and him; her own song files, played in this page. {name} = him, {title} = the song
+app.music.label = 一起听
+app.music.with = 和{name}一起听歌
+app.music.none = 还没有选歌
+app.music.lead = 从你的手机里选歌，和{name}一起听
+app.music.pick = 选歌
+app.music.prev = 上一首
+app.music.next = 下一首
+app.music.like = 喜欢
+app.music.seek = 进度
+app.music.me = 我
+app.music.mode.all = 列表循环
+app.music.mode.one = 单曲循环
+app.music.mode.shuffle = 随机播放
+app.music.lyrics.add = 歌词
+app.music.room = 边听边聊
+app.music.room.with = 和{name}一起听
+app.music.room.with.min = 和{name}一起听 · {m}分钟
+app.music.room.empty = 放一首歌，{name}会在这里和你聊
+app.music.say = 发送
+app.music.say.placeholder = 和{name}说点什么
+app.music.his.like = {name}也喜欢这首 ♥
+app.music.his.short = 他♥
+app.music.his = {name}的歌单
+app.music.his.none = {name}还没有喜欢的歌
+app.music.queue = 播放列表
+app.music.queue.none = 还没有歌，点选歌加几首
+app.music.queue.drop = 移出列表
+app.music.history = 听过的
+app.music.history.none = 还没有听过的歌
+app.music.foot = 歌只在这台手机里放，不会上传。歌名、歌手和歌词（.lrc）会让{name}知道你们在听什么。
+app.music.widget.none = 选一首歌一起听
+app.music.widget.pick = 点一下去选歌
+app.music.widget.on = 和{name}一起听
+app.music.widget.off = 已暂停
+app.music.card.sub = 一起听这首
+app.music.card.end = [一起听] 一起听了{n}首歌，{time}
+app.music.card.min = {m}分钟
+app.music.card.lessmin = 不到1分钟
+app.music.chat = [一起听] 《{title}》
+app.music.toast.playing = 正在放：{title}
+app.music.toast.queued = 加进了播放列表：{n}首
+app.music.toast.lyrics = 歌词加好了
+app.music.toast.nolyrics = 这不是带时间的歌词（.lrc）
+# a file picked as a song that is not one (the picker lists every file)
+app.music.toast.notsong = 「{file}」不是歌曲文件，可以选 mp3、m4a 这样的歌
+app.music.toast.noanswer = 他暂时没有回应
+
+# ===== app: peek =====
+# 查手机 (a game; how it is made is said once, in 设置 → 关于, never here). {name} = him, {inner} = his 心声, {n} = how many things were left out
+app.peek.open = 看看{name}的手机
+app.peek.again = 再看看
+app.peek.looking = 正在翻…
+app.peek.notes = 备忘录
+app.peek.searches = 搜索记录
+app.peek.songs = 歌单
+app.peek.chats = 聊天
+app.peek.inner = 心声：{inner}
+app.peek.toast.fail = 没打开，可以再试一次
+
+# ===== app: call =====
+# 通话: the dock's screen (最近通话, 联系人) and the call card in the chat. {len} = 03:12; {q} = her first words
+app.call.title = 通话
+app.call.video = 视频通话
+app.call.recent = 最近通话
+app.call.recent.none = 还没有通话
+app.call.contacts = 联系人
+app.call.row = 视频通话 {len}
+app.call.gone = 不在联系人里了
+app.call.yesterday = 昨天
+app.call.card = [视频通话] 通话时长 {len}
+app.call.sheet.len = 通话时长 {len}
+app.call.sheet.none = 这次通话没有说话
+app.call.her = 我
+app.call.gist.fallback = 聊到「{q}」
+
+# his phone (read-only): {she} = her name (or 她), {name} = him; {m} {d} = month and day, {w} = the weekday (one of app.peek.week), {t} = a time
+app.peek.phone = {name}的手机
+app.peek.week = 日,一,二,三,四,五,六
+app.peek.lock.date = {m}月{d}日 星期{w}
+app.peek.yesterday.at = 昨天 {t}
+app.peek.md = {m}月{d}日 {t}
+app.peek.day = {m}月{d}日
+app.peek.wechat = 微信
+app.peek.empty = 这里还什么都没有
+app.peek.about = 关于{she}
+app.peek.wallet.title = 零钱明细
+app.peek.wallet.redpacket = 红包
+app.peek.wallet.transfer = 转账
+app.peek.wallet.from = {she}发来的{what}
+app.peek.wallet.gift = 送{she}的{item}
+app.peek.wallet.kind.start = 零钱余额
+app.peek.wallet.kind.salary = 工资
+app.peek.wallet.kind.redpacket = 红包
+app.peek.wallet.kind.transfer = 转账
+app.peek.wallet.kind.daifu = 帮{she}代付
+app.peek.wallet.kind.kin-pay = 亲属卡消费
+app.peek.wallet.kind.order = 购物
+app.peek.wallet.state.sent = 待收下
+app.peek.wallet.state.accepted = 已收下
+app.peek.wallet.state.returned = 已退回
+app.peek.music.together = 和{she}一起听过的
+app.peek.shop.got = {she}送我的
+app.peek.shop.sent = 我送{she}的
+app.peek.mail.from = {she}的来信
+app.peek.mail.to = 写给{she}的信
+
+# ===== more screens: 设置, 搬家, 记忆, 查手机, the chat =====
+# 设置 → 他找你 (主动): how often he may write first. {n} = a number, {from} {to} = two times like 23:00
+reach.title = {name}找你
+reach.on = 让{name}主动找你
+reach.on.sub = {name}有空、有话说的时候，会先发消息给你。大多数时候不会。
+reach.cap = 每天最多
+reach.cap.n = {n} 次
+reach.cap.foot = 你定的是上限，{name}自己的习惯只会更少，不会更多。
+reach.quiet = 免打扰
+reach.quiet.range = {from} 到 {to}
+reach.quiet.foot = 这段时间里{name}不会先找你。你让{name}到点叫你的事照常；别的说好的事，等免打扰结束再说。
+reach.notice = 消息提醒
+reach.notice.sub = 小手机开着但不在眼前时，弹出提醒
+reach.notice.ask = 要允许提醒，请在接下来的窗口里点「允许」
+reach.notice.denied = 提醒被关掉了，可以在手机或电脑的设置里重新打开
+reach.notice.locked = 手机锁屏以后收不到提醒，下个版本会有。
+reach.away = 说好的事
+reach.away.foot = 你不在的时候，{name}说要做的事到点照样发生。离开 {away}以上再回来，你会看到{name}在你不在时发来的一条。前提是他找你的次数那天还没用完。要是正好有说好的事到点、或你有消息等他回，那一条就是它。他上一条你还没回的话，他不会追着再发。你在他睡着时发的消息，他醒来就回。那时你不在，等你回来就能看到。你回来以后按时间顺序看到，一次最多 {n} 条。
+# 设置 → 模型: a cheaper model for the small jobs (his day, deciding whether to write, tidying memory)
+side.title = 小事用的模型
+side.sub = 安排{name}的一天、决定要不要找你、整理记忆，这些可以用便宜一点的模型
+side.same = 和聊天用同一个
+side.other = 另选一个
+# under the side model's rows while it has no model name yet
+side.draft = 填好模型名后才会用
+side.foot = 聊天还是用上面的模型。小事用的模型也只发给你选的模型服务，API key 只存在这台设备上。
+# 设置 → 用量: the calls of the last days. {n} = a number, {k} = thousands of tokens
+cost.title = 用量
+# the model she is on, at the top of 用量
+cost.model.chat = 聊天用的模型
+cost.model.none = 还没有选
+cost.today = 今天
+cost.week = 最近 7 天
+cost.chat = 聊天 {n} 次
+cost.side = 其他 {n} 次
+cost.tokens = 约 {k} 千 token
+cost.row.sketch = 一天的安排
+cost.row.decider = 要不要找你
+cost.row.memory = 整理记忆
+cost.row.diary = 写日记
+cost.row.shelf = {name}可能喜欢
+cost.row.contacts = 查手机的联系人
+cost.row.calibrate = 读角色卡
+cost.row.meaning = 按意思找记忆
+cost.row.reach = {name}找你
+cost.row.post = 朋友圈
+cost.row.letter = 信箱
+cost.row.app = 小手机里的应用
+cost.row.check = 测试连接
+# a reply cut off while the model was still thinking, asked once more with more room
+cost.row.retry = 模型想太久，又问了一次
+cost.row.other = 别的
+# 设置 → 用量 → 最近发出的: what each call sent, in brief. {time} {what} {n} = messages, {k} = characters, {model}
+cost.sent = 最近发出的
+cost.sent.line = {time} {what} · {n} 段 · {k} 字 · {model}
+cost.sent.today = 今天 {hm}
+cost.sent.yesterday = 昨天 {hm}
+cost.sent.day = {m}月{d}日 {hm}
+cost.sent.none = 还没有发出过
+# 最近发出的 is one row under 用量; a tap opens the list. {n} = how many calls the list holds
+cost.sent.count = {n} 条
+cost.sent.foot = 只记下发给了哪个模型、多长、开头几个字，不记 API key，也不留整段内容。
+cost.foot = 次数和 token 是这台设备记下的估算，实际以模型服务的账单为准。
+# 记忆: when an outside memory keeps his memories instead of Modu's own
+memory.source.title = 记忆由你自己的记忆服务保管
+memory.source.text = {name}的记忆现在放在「{source}」里，这里只能看到{name}最近想起的几条。要修改，请到那边改。
+memory.source.back = 换回小手机自己的记忆
+memory.source.off = 连不上「{source}」，这次先按聊天记录回话
+# 搬家: the parts of a card that are kept but not used here
+import.unused.title = 这里不用的部分
+import.unused.lead = 这些原样保存在角色卡里，导出时一起带走，只是小手机里不会运行：
+import.unused.script = 酒馆助手脚本 {n} 个
+import.unused.mvu = 变量脚本（MVU）{n} 个
+import.unused.html = 网页界面（前端卡）{n} 个
+import.unused.link = 外部链接 {n} 个，不会打开
+import.unused.sampling = 预设里的采样参数：按你在「模型」里的设置来
+import.unused.none = 角色卡的内容都用上了
+# more of what is kept but not used; files not recognised. {names} = file names
+import.unused.notes = 作者的话（creator_notes）：保存在卡里，不放进他的设定
+import.unused.greetings = 其他开场白 {n} 个：保存在卡里，现在还不能换着用
+import.unused.files = 没认出来的文件：{names}，没有用上
+import.unknown.only = 没认出来这些文件：{names}
+# each file that came beside the card, and what it became. {file} = the file's name, {n} = a number
+import.folder.preset = {file} → 随角色带来的预设 · {n} 段
+import.folder.preset.mine = {file} → 你自己的预设 · {n} 段，可以在设置里一段一段开关
+import.folder.regex = {file} → 文字替换 {n} 条
+import.folder.contacts = {file} → 查手机里的联系人 {n} 位
+import.folder.params = {file} → 他的作息和习惯
+import.folder.lore = {file} → 世界书 {n} 条，放进他的设定
+# her own pronoun file ({p} = 他 / 她 / TA); her params' hidden settings, counted, never named; ones that cannot be used
+import.folder.pronouns = {file} → 说起他时用「{p}」，不用再选
+import.folder.params.state = ，还有 {n} 个隐藏的设定
+import.folder.params.bad = ；另有 {n} 个隐藏的设定写法不对，没有用上
+import.state.bad = 角色卡里有 {n} 个隐藏的设定写法不对，没有用上
+# files picked on their own, for the companion who is open. {name} = his name
+import.drop.addon = 这些文件会放在{name}的角色卡旁边，角色卡本身不会改
+import.addon.go = 放到{name}的角色卡旁边
+import.addon.done = 放好了，{name}已经用上
+import.addon.nobody = 这些文件要放在角色卡旁边：请和角色卡一起选，或者先搬一个角色进来
+# the default companion char, once her own has moved in and she had talked with him. {name} = his name
+import.first.title = 还要留着{name}吗？
+import.first.text = 你和{name}聊过天。删除后，和{name}的聊天记录和记忆会从这台设备上删除，无法恢复。
+import.first.keep = 留着
+# 搬家: his pronoun, asked once when the card does not say
+import.pronoun.ask = 说起{name}时用哪个字？
+import.pronoun.he = 他
+import.pronoun.she = 她
+import.pronoun.they = TA
+import.pronoun.foot = 用在你们的聊天、{name}的日记，和小手机里说起{name}的地方，之后可以在设置里改。
+# a file that could not be used, and why. {file} = the file's name
+import.why.big = 「{file}」太大了，无法导入（在这台设备上最多 {max} MB）
+import.why.empty = 「{file}」是空的，里面什么也没有
+import.why.zip = 「{file}」是压缩包，无法直接打开。请先解压，再选择里面的文件
+import.why.zip.locked = 「{file}」是加密的压缩包，无法直接打开。请先在电脑上解压（密码一般是你 c.ai 账号的邮箱），再选择里面的 message.json、character.json 和头像图片
+import.why.backup = 「{file}」是小手机的备份：点下面的「打开这个备份」就能搬回来
+import.why.photo = 「{file}」是一张照片，里面没有角色卡。从「相册」选的图会被手机压缩，角色数据会丢。请从「文件」（iPhone）或「文件管理」（安卓）里选原来的 png
+import.why.no.card = 「{file}」这张图片里没有角色卡。如果是从「相册」选的，请改从「文件」（iPhone）或「文件管理」（安卓）里选原来的 png
+import.why.not.png = 「{file}」不是 png 图片，可能被改过名字
+import.why.broken.card = 「{file}」里的角色数据坏了（文件可能没下载完整），请重新下载一次
+import.why.broken.json = 「{file}」坏了，读不出来（文件可能没下载完整）
+import.why.no.chat = 「{file}」里没有能读的聊天记录
+import.why.unknown = 「{file}」不是能导入的文件，没有用上
+import.error.plain = 这个文件读不出来，请换一个文件再试
+# a second card picked after the first; memories with no one to go to; a chat that never says his name
+import.fresh = 这次是另一个角色，之前选的文件没有带上
+import.memory.alone = 这些记忆还需要一个角色：请和角色卡或聊天记录一起选
+import.name.type = 角色叫什么名字？
+# a picture picked before his card or chat
+import.picture.only = 头像已收到，再选角色卡或聊天记录。如果这张图本来就是角色卡，请从「文件」（iPhone）或「文件管理」（安卓）里选原来的 png
+# two cards or two chats in one pick. {n} = a number
+import.pick.card = 这次选了两个角色，搬哪一个？
+import.pick.chat = 这次选了几份聊天记录，用哪一份？
+import.pick.chat.n = {n} 条
+# a picture with no card in it; the card's Character's Note, kept and not used
+import.photo.nocard = 头像里没有角色卡：如果是从「相册」选的图，请改从「文件」（iPhone）或「文件管理」（安卓）里选原来的 png
+import.unused.depth = 角色备注（Character's Note）：保存在卡里，不放进他的设定
+# while he moves in; she went back meanwhile. {name} = his name
+import.saving = 正在搬…
+import.saved.away = {name}搬好了，在「聊天」里
+# a companion of the same name is already here
+import.twin.title = 已经有一个{name}了
+import.twin.text = 替换：新的{name}搬进来以后，旧的{name}和你们的聊天记录、记忆会从这台设备上删除，无法恢复。都留着：会有两个{name}。
+import.twin.replace = 替换（删除旧的，无法恢复）
+import.twin.text.folder = 替换：新的{name}搬进来以后，旧的{name}从列表中移除，他的资料还在电脑上，之后可以在搬家里接回来。都留着：会有两个{name}。
+import.twin.replace.folder = 替换（旧的从列表中移除）
+import.twin.both = 都留着
+import.backup.go = 打开这个备份
+# a chat and a card of two different companions. {chat} / {card} = the names in the chat / on the card
+import.mismatch.title = 这份聊天记录是「{chat}」的，要和「{card}」一起搬吗？
+import.mismatch.text = 「{chat}」和「{card}」看起来不是同一个角色。一起搬：「{card}」会带着这份聊天记录。只搬角色卡：这份聊天记录这次不带上。
+import.mismatch.both = 一起搬
+import.mismatch.card = 只搬角色卡
+import.mismatch.line = 聊天记录是「{chat}」的，角色卡是「{card}」
+# the choice in the 用哪一份 / 搬哪一个 picker, which she can change
+import.pick.card.done = 搬这个角色：
+import.pick.chat.done = 用这份聊天记录：
+import.pick.again = 换一个
+# a 酒馆 card picked with a c.ai export; memories alone while someone is open; back in 搬家 mid-save
+import.why.mixed = 「{file}」是酒馆的角色卡，这次没有用上：c.ai 的导出和酒馆的角色卡要分开搬，一次搬一种
+import.memory.alone.open = 这些记忆还需要和角色卡或聊天记录一起选。想给{name}添一条记忆，可以在{name}的「记忆」里写
+import.moving = {name}正在搬进来…搬好以后会在「聊天」里，不用再选一次
+# 查手机: his contacts, off until she says yes. {n} = a number
+peek.contacts.ask = 给{name}的手机加上联系人？
+peek.contacts.ask.sub = 照着{name}的角色卡，写出手机里会有的人：同事、家人、朋友、常去的店。
+peek.contacts.cost = 会用一次模型，最多约 {k} 千 token。
+peek.contacts.yes = 好，写吧
+peek.contacts.no = 先不用
+peek.contacts.pick = 留下哪些人？
+peek.contacts.keep = 留下 {n} 个
+peek.contacts.again = 重新写一份
+peek.contacts.working = 正在写…
+peek.contacts.failed = 没写成。
+# why it did not work, said where she looks; {why} = the model service's own words
+peek.contacts.retry = 再试一次
+peek.contacts.why.paused = 现在是暂停中，暂停的时候不用模型。关掉暂停（{name}找你 那一页）再来。
+peek.contacts.why.timeout = 等了两分钟，模型还没有回音。它可能还在写：写好了会自己出现；点再试一次会接着等这一次，不会再花一次。
+peek.contacts.why.empty = 模型只想了没写出来。再试一次，或者换个模型。
+peek.contacts.why.cut = 写到一半断了，再试一次。
+peek.contacts.why.unreadable = 模型写回来的看不懂，再试一次。
+peek.contacts.why.model = 模型服务说：{why}
+peek.contacts.off = 查手机的联系人
+peek.contacts.off.sub = 关掉以后，{name}的手机里只有你
+# 章节: starting again from another of the card's greetings
+chapter.title = 换个开头
+chapter.lead = 角色卡里有 {n} 个开场白。换一个，就从那里重新开始一段；之前的聊天和记忆都还在。
+chapter.pick = 从这里开始
+chapter.current = 现在这段
+chapter.n = 第 {n} 段
+chapter.back = 回到这段
+# 邀请: his invite card in the chat. {name} = him
+invite.game = 来一局？
+invite.music = 一起听吗？
+invite.pay = 要不要我帮你付？
+invite.yes = 好啊
+invite.no = 下次吧
+invite.open = 打开
+invite.gone = 已经过去了
+invite.done = 一起玩过了
+invite.declined = 你说了下次
+# ===== 设置 → the preset she brought with his card (read only) =====
+layers.preset.title = 带来的预设
+layers.preset.on = 开
+layers.preset.off = 关
+layers.preset.foot = 这是和角色卡一起带来的预设，是角色卡自己的设置，这里只用不改。按原来的顺序放在小手机自己的规矩后面。里面的采样参数不用，按你在「模型」里的设置来。
+# a card's own preset is one read-only line (its size, no block names); a preset she added herself has switches
+layers.preset.card = 随角色带来的预设 · {n} 段
+# 设置 → what else came with his card, read only. {n} = a number
+layers.card.title = 随角色带来的
+layers.card.regex = 随角色带来的文字替换（正则）· {n} 条
+layers.card.params = 随角色带来的作息和习惯
+layers.card.state = ，隐藏的设定 {n} 个
+layers.card.state.only = 隐藏的设定 {n} 个
+layers.card.contacts = 随角色带来的联系人 · {n} 位
+layers.card.foot = 这些是角色卡自己带来的设置，这里只用不改。隐藏的设定只有他自己知道，不会显示出来。
+layers.preset.foot.mine = 这是你自己加的预设，每一段都可以打开或关掉，按原来的顺序放在小手机自己的规矩后面。里面的采样参数不用，按你在「模型」里的设置来。
+
+# ===== 他找你, 暂停, read marks, invites on the card. {name} = his name =====
+reach.pause = 暂停
+reach.pause.sub = 暂停的时候，{name}不会主动找你，后台也不花一点 token
+reach.pause.foot = 出门几天可以打开暂停。关掉以后就像你刚回来：{name}只补最近几天，不会一天一天全补。
+reach.pause.on = 已暂停
+reach.cap.off = 不主动
+reach.quiet.pick = 免打扰时间
+reach.quiet.none = 不设
+reach.read = 已读
+reach.delivered = 已送达
+reach.away.days = {n} 天
+reach.away.hours = {n} 个小时
+reach.wake.shut = 小手机没打开的时候，{name}答应叫你也响不了，要等你打开才看到。手机上的闹钟下个版本会有。
+side.endpoint = 地址
+side.model = 模型名
+side.key = API key
+app.shop.invite.pays = {name}说这次他来付，挑好下单就行
+# 记忆: her own memory's page links out; finding a memory by what it means, with her own key (off by default)
+memory.source.open = 去那边看看
+memory.meaning = 按意思找回记忆
+memory.meaning.sub = 默认关。打开后，新记下的事和每次聊天都会发给你填的服务算一次，会花一点 token。key 只存在这台设备里，不进{name}的文件夹。
+memory.meaning.endpoint = 服务地址
+memory.meaning.model = 模型名
+memory.meaning.key = key
+memory.meaning.on = 打开
+memory.meaning.off = 关掉
+memory.meaning.forget = 删掉已经算好的
+memory.meaning.forgot = 已删掉，需要时会重新算
+memory.meaning.saved = 已保存
+# 查手机: his status, today's slots in his 备忘录, his 联系人
+app.peek.status.asleep = 睡着了
+app.peek.status.busy = 在忙
+app.peek.today = 今天
+app.peek.yesterday = 昨天
+app.peek.contacts = 联系人
+app.peek.g.m = 男
+app.peek.g.f = 女
+# 查手机: his home screen's widgets. {w} = the weekday (one of app.peek.week)
+app.peek.w.today = 今天 · 星期{w}
+app.peek.w.day.none = 今天还没做什么
+app.peek.w.notes.none = 还没有记什么
+app.peek.w.her.none = 还没有消息
+# an app of his with nothing in it yet, in his phone's own plain words
+app.peek.empty.wallet = 最近没有零钱往来
+app.peek.empty.shop = 最近没有买东西
+app.peek.empty.food = 最近没有点外卖
+app.peek.empty.mail = 还没有信
+app.peek.shop.own = 我买的
+app.peek.food.own = 我点的
+# the chat's top bar while a reply of his is coming in
+chat.typing = 对方正在输入…

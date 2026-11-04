@@ -1,0 +1,27 @@
+/* 小游戏: styles for its own screen only. Colours come from the skin's tokens.
+   Everything wraps: a long question or answer never runs off a 375-wide screen. */
+#s-app-game .a-game-rps,#s-app-game .a-game-truth{padding:14px 14px 12px;display:flex;flex-direction:column;gap:12px}
+#s-app-game .a-game-lead{margin:0;font-size:14px;color:var(--m-fg2);line-height:1.6;overflow-wrap:anywhere}
+#s-app-game .a-game-hands{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+#s-app-game .a-game-hands button{padding:16px 0;min-height:48px;border-radius:var(--m-radius);background:var(--m-accent);color:var(--m-accent-fg);font-size:17px;font-weight:600;letter-spacing:.1em}
+#s-app-game .a-game-hands button[disabled]{opacity:.5}
+#s-app-game .a-game-score{font-size:12px;color:var(--m-muted);text-align:center}
+#s-app-game .a-game-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#s-app-game .a-game-two button{min-height:48px;padding:10px 8px;border-radius:var(--m-radius);border:1px solid var(--m-line);color:var(--m-fg);font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+#s-app-game .a-game-stage{display:flex;flex-direction:column;gap:10px;padding-top:10px;border-top:1px solid var(--m-line);min-width:0}
+#s-app-game .a-game-stage[hidden]{display:none}
+#s-app-game .a-game-res{font-size:22px;text-align:center;color:var(--m-fg)}
+#s-app-game .a-game-vs{font-size:14px;text-align:center;color:var(--m-fg2)}
+#s-app-game .a-game-q,#s-app-game .a-game-his{display:flex;flex-direction:column;gap:2px;min-width:0}
+#s-app-game .a-game-q small,#s-app-game .a-game-his small{font-size:11.5px;color:var(--m-muted)}
+#s-app-game .a-game-q p,#s-app-game .a-game-his p{margin:0;font-size:15px;line-height:1.6;color:var(--m-fg);white-space:pre-wrap;overflow-wrap:anywhere}
+#s-app-game .a-game-his p{background:var(--m-soft);border-radius:var(--m-radius);padding:8px 12px}
+#s-app-game .a-game-hisq p{font-size:16px;font-weight:600}
+#s-app-game .a-game-wait p{color:var(--m-muted);background:transparent;padding:0}
+#s-app-game .a-game-inner{align-self:flex-start;display:flex;align-items:baseline;gap:6px;max-width:100%;padding:2px 0;font-size:13px;line-height:1.5;color:var(--m-muted);text-align:left}
+#s-app-game .a-game-inner-k{flex:0 0 auto;font-size:11px;letter-spacing:.1em;padding:0 7px;border-radius:999px;border:1px dashed var(--m-line)}
+#s-app-game .a-game-inner[aria-expanded="true"] .a-game-inner-k{border-style:solid}
+#s-app-game .a-game-inner-t{font-style:italic;min-width:0;overflow-wrap:anywhere}
+#s-app-game .a-game-inner-t:not(:empty)::before{content:"「"}
+#s-app-game .a-game-inner-t:not(:empty)::after{content:"」"}
+#s-app-game textarea{width:100%;box-sizing:border-box;resize:none;font:inherit;font-size:16px;line-height:1.5;padding:10px 12px;border-radius:var(--m-radius);border:1px solid var(--m-line);background:var(--m-bg);color:var(--m-fg)}

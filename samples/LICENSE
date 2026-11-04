@@ -1,0 +1,4 @@
+The character cards in this folder, char_zh.png and char_en.png (and the sample chat and memory files beside
+them, char_zh_chat.jsonl and char_zh_memory.md), are Modu's own: the character, the words and the picture were
+made for Modu by samples/make_char.py. They are under the same licence as Modu itself: see the LICENSE file at the
+root of the repository.

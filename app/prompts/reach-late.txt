@@ -1,0 +1,5 @@
+# reach-late v1
+# her held message answered only now, because the page was shut when he woke
+# vars: sent, now, later
+# later: "<n> hours" or "<n> days"
+She wrote to you on {{sent}} while you were asleep, and you are only answering it now ({{now}}, {{later}} later). Answer her now, briefly and naturally, from where you are in your own day; do not pretend it just arrived, and if it fits say in a few words why it took you so long, without a long apology.

@@ -1,0 +1,8 @@
+/* 相册: only inside its own screen; colours are skin tokens */
+/* each picture has its own round corners (rounding only the grid's outer corners leaves one or two pictures round on
+   the left and sharp on the right); minmax(0,1fr) keeps a long caption of his from widening a column past the screen */
+#s-app-album .a-album-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+#s-app-album .a-album-pic{aspect-ratio:1;background:var(--m-ta) center/cover no-repeat;border:0;padding:0;width:100%;min-width:0;border-radius:calc(var(--m-radius) * .5);overflow:hidden}
+#s-app-album .a-album-empty{width:100%}
+#s-app-album .a-album-his{display:flex;align-items:center;justify-content:center;padding:8px;color:var(--m-fg);font-size:12px;line-height:1.4;text-align:center;overflow:hidden}
+#s-app-album .a-album-his span{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}

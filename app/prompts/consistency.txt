@@ -1,0 +1,29 @@
+# consistency v1
+# vars: char, user, pronoun, pronoun_en, card_facts, moving_facts, said_facts, memory_items, lang
+You check that {{char}} ({{pronoun}} / {{pronoun_en}}) stays one person over time. Read the lists below and find where they disagree.
+
+Facts from the card that never change (who {{char}} is):
+{{card_facts}}
+
+Facts from the card that may move with time (the card only gives where they started):
+{{moving_facts}}
+
+Things {{char}} has said in chat about {{char}}'s own life (newest last):
+{{said_facts}}
+
+What memory holds now:
+{{memory_items}}
+
+Rules:
+1. A fixed card fact wins over anything said. If {{char}} said something that breaks it, mark the said fact as a slip.
+2. For a moving fact, memory and the newest thing said win over the card. Record the current value; do not pull it back to the card.
+3. If two things {{char}} said contradict each other and neither breaks the card, keep the newer one.
+4. If nothing disagrees, return empty lists. Do not rewrite anything that already agrees.
+5. Never change the card. Never add a fact nobody said.
+
+Write any text in {{lang}}, from {{char}}'s side.
+Answer with JSON only:
+{"current":[{"fact":"","value":"","from":"memory|said"}],
+ "slips":[{"said":"","breaks":"","keep":""}],
+ "drop_said":[""]}
+"current" is the present value of each moving fact that changed. "slips" are said facts that break a fixed one, with what to keep. "drop_said" lists said facts that are overtaken and can go.

@@ -1,0 +1,30 @@
+{"user_name": "小葵", "character_name": "char", "create_date": 1788062400000}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1788062520000, "mes": "*他放下手机。* 来了？今天过得怎么样？"}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1788062580000, "mes": "第一次跟你聊天，不知道说什么哈哈"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1788062580000, "mes": "那就随便说。\n我叫 char，你想怎么叫都行。", "extra": {"modu_emotion": "joy", "modu_emotion_from": "model"}}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1788062700000, "mes": "那就叫你 char 吧"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1788062700000, "mes": "char。\n好，就这个。", "extra": {"modu_emotion": "relief", "modu_emotion_from": "model"}}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1788586800000, "mes": "今天开会开到九点半，回来的公交上差点坐过站"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1788586860000, "mes": "*他停下手里的事。* 九点半？\n晚饭呢，吃了什么。说实话。", "extra": {"modu_emotion": "sadness", "modu_emotion_from": "model"}}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1788586860000, "mes": "便利店的一个三明治……"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1788586920000, "mes": "三明治只能算点心。\n明天中午找个店坐下来吃，吃完告诉我吃了什么。"}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1789874100000, "mes": "我家狗今天把我的拖鞋啃坏了"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1789874160000, "mes": "豆包又干坏事了？\n*他笑了一下。* 它大概是想你了，你的东西上有你的味道。", "extra": {"modu_emotion": "joy", "modu_emotion_from": "model"}}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1789874220000, "mes": "你还记得它叫豆包！"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1789874220000, "mes": "你讲过的我都记得。\n拖鞋以后放进鞋柜，别给它机会。", "extra": {"modu_emotion": "relief", "modu_emotion_from": "model"}}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1791354600000, "mes": "失眠了"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1791354660000, "mes": "那我陪你醒一会儿。\n不想说话就不说。"}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1791354960000, "mes": "外面风好大"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1791354960000, "mes": "*他走到窗边看了一眼。* 我这边也是，窗户一直在响。\n听一会儿风声，说不定就困了。", "extra": {"modu_emotion": "relief", "modu_emotion_from": "model"}}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1792810080000, "mes": "我第一次做红烧肉，做咸了……"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1792810140000, "mes": "咸到什么程度？\n加几块土豆再炖一会儿，能吸掉一些。", "extra": {"modu_emotion": "surprise", "modu_emotion_from": "model"}}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1792810200000, "mes": "咸到不能吃那种"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1792810200000, "mes": "*他没忍住笑。* 那这周六再做一次。\n我在电话这头帮你看着酱油。", "extra": {"modu_emotion": "joy", "modu_emotion_from": "model"}}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1792988400000, "mes": "下周三想去植物园，你说过的那个大温室"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1792988460000, "mes": "南门进去那个？里面有棵很老的龟背竹，上午光最好。\n去了拍给我看。", "extra": {"modu_emotion": "joy", "modu_emotion_from": "model"}}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1793077500000, "mes": "今天有点难过，面试没过"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1793077560000, "mes": "*他把手机拿近了些。* 哪一家？\n慢慢说，我在。", "extra": {"modu_emotion": "sadness", "modu_emotion_from": "model"}}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1793077740000, "mes": "就是我最想去的那家，最后一轮被刷了"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1793077800000, "mes": "能走到最后一轮，说明前面几轮他们都认你。\n把这次的题目记下来，下次就是你的。\n今晚先别想了，泡个脚。"}
+{"name": "小葵", "is_user": true, "is_name": true, "send_date": 1793079000000, "mes": "泡完了，舒服多了"}
+{"name": "char", "is_user": false, "is_name": true, "send_date": 1793079060000, "mes": "那就好。\n早点睡，明天我还在。", "extra": {"modu_emotion": "relief", "modu_emotion_from": "model"}}

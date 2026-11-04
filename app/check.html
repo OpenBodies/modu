@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Modu 小手机 · 自检</title>
+<!-- The self-check page. One plain page beside index.html, with none of the phone's code and the oldest
+     JavaScript (ES5), so it opens on any engine, including one that cannot run core.js. It says on screen what the
+     phone's own failure note cannot when nothing ran at all: which browser engine this is, which syntax and features
+     it has (compiled, not guessed: each file the phone starts with is fetched and compiled here, and a SyntaxError
+     names the line), what the site really served (a login page instead of a script shows up as HTML), what is left
+     from an old service worker, and how tall the window really is (the iPhone strip). 复制全部 puts it all in one
+     text to send to the developers. Its words are its own, not words.txt (which may be what did not load). -->
+<style>
+  body{margin:0;padding:max(14px,env(safe-area-inset-top,0px)) 14px max(14px,env(safe-area-inset-bottom,0px));font:15px/1.6 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f6f3ee;color:#333;-webkit-text-size-adjust:100%}
+  h1{font-size:19px;margin:6px 0 4px} h2{font-size:15px;margin:20px 0 6px;color:#5a5650}
+  p{margin:6px 0}
+  table{border-collapse:collapse;width:100%;background:#fff;border-radius:10px;overflow:hidden}
+  td{padding:4px 8px;border-bottom:1px solid #ece6dc;vertical-align:top;word-break:break-all;font-size:13.5px}
+  td:first-child{white-space:nowrap;color:#5a5650;width:38%}
+  .ok{color:#1f8a4c} .no{color:#c0392b;font-weight:600} .warn{color:#b26a00}
+  button{font:inherit;font-size:15px;padding:9px 14px;border-radius:12px;border:1px solid #c9c2b6;background:#fff;color:#333;margin:4px 6px 4px 0}
+  button:disabled{opacity:.5}
+  pre{white-space:pre-wrap;word-break:break-all;background:#fff;border:1px solid #ece6dc;border-radius:10px;padding:8px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;-webkit-user-select:text;user-select:text}
+  #frame{width:100%;height:560px;border:1px solid #c9c2b6;border-radius:10px;background:#fff;display:block}
+  .note{font-size:13px;color:#5a5650}
+</style>
+</head>
+<body>
+<h1>Modu 小手机 · 自检</h1>
+<p>这一页不打开小手机，只看这台手机的浏览器能不能跑它。等到最下面出现「检查完了」，点 <b>复制全部</b>，把文字发给我们。</p>
+<p><button id="copy">复制全部</button> <button id="boot">在下面打开小手机，记下报错</button> <button id="clean">清掉旧的后台程序和缓存</button></p>
+<p class="note" id="state">正在检查……</p>
+<div id="out"></div>
+<div id="frameBox" hidden><h2>小手机（在这一页里打开）</h2><iframe id="frame" title="Modu 小手机"></iframe></div>
+<h2>全部文字（复制这一段）</h2>
+<pre id="raw"></pre>
+
+<script>
+(function(){
+'use strict';
+var report = [], sections = {}, order = [], raw = document.getElementById('raw'), out = document.getElementById('out');
+var ownErrors = [];
+window.onerror = function(msg, src, line, col){ ownErrors.push(String(msg) + ' (' + String(src || '').split('/').pop() + ':' + line + ':' + col + ')'); row('这一页自己的报错', '报错 ' + ownErrors.length, ownErrors[ownErrors.length - 1], 'no'); };
+
+function row(section, key, value, status){
+  if (!sections[section]) { order.push(section); sections[section] = { h: document.createElement('h2'), t: document.createElement('table') }; sections[section].h.textContent = section; out.appendChild(sections[section].h); out.appendChild(sections[section].t); }
+  var tr = document.createElement('tr'), a = document.createElement('td'), b = document.createElement('td');
+  a.textContent = key; b.textContent = String(value); if (status) b.className = status;
+  sections[section].t.appendChild(tr); tr.appendChild(a); tr.appendChild(b);
+  report.push([section, key, String(value), status || '']);
+  render();
+}
+function render(){
+  var lines = ['Modu 小手机 自检 · ' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' · ' + location.href], i, last = '';
+  for (i = 0; i < report.length; i++) {
+    if (report[i][0] !== last) { last = report[i][0]; lines.push('', '## ' + last); }
+    lines.push((report[i][3] === 'no' ? '✗ ' : report[i][3] === 'warn' ? '△ ' : report[i][3] === 'ok' ? '✓ ' : '· ') + report[i][1] + ': ' + report[i][2]);
+  }
+  raw.textContent = lines.join('\n');
+}
+function yes(v){ return v ? 'ok' : 'no'; }
+
+// ---------- 1. the browser ----------
+var ua = navigator.userAgent || '';
+(function(){
+  var S = '浏览器', m, eng = [];
+  row(S, 'User-Agent', ua);
+  if ((m = /HuaweiBrowser\/([\d.]+)/.exec(ua))) eng.push('华为浏览器 ' + m[1]);
+  if ((m = /ArkWeb\/([\d.]+)/.exec(ua))) eng.push('ArkWeb ' + m[1]);
+  if ((m = /(?:UCBrowser|UBrowser)\/([\d.]+)/.exec(ua))) eng.push('UC ' + m[1]);
+  if ((m = /MQQBrowser\/([\d.]+)/.exec(ua))) eng.push('QQ浏览器 ' + m[1]);
+  if ((m = /MicroMessenger\/([\d.]+)/.exec(ua))) eng.push('微信 ' + m[1]);
+  if ((m = /(?:Chrome|CriOS)\/(\d+)/.exec(ua))) { eng.push('Chrome ' + m[1]); var n = +m[1]; row(S, 'Chrome 内核版本', n + (n < 80 ? '：太旧，core.js 用的 ?. 语法要 Chrome 80' : n < 87 ? '：偏旧，inset 布局要 Chrome 87' : n < 92 ? '：偏旧，Array.at 要 Chrome 92' : '：够新'), n < 80 ? 'no' : n < 92 ? 'warn' : 'ok'); }
+  else if ((m = /Version\/([\d.]+)/.exec(ua))) eng.push('Safari ' + m[1]);
+  else if (/iPhone|iPad/.test(ua)) eng.push('iOS WebKit（桌面 app 或内嵌）');
+  if ((m = /(HarmonyOS[^;)]*|Android[^;)]*|iPhone OS [\d_]+|CPU OS [\d_]+)/.exec(ua))) eng.push(m[1].replace(/_/g, '.'));
+  row(S, '引擎（从 UA 看）', eng.join(' · ') || '认不出来');
+  row(S, '从桌面图标打开（standalone）', (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true ? '是' : '否');
+  row(S, '窗口 innerWidth × innerHeight', window.innerWidth + ' × ' + window.innerHeight);
+  row(S, '屏幕 screen.width × height', screen.width + ' × ' + screen.height + ' · dpr ' + (window.devicePixelRatio || 1));
+  row(S, 'visualViewport', window.visualViewport ? Math.round(visualViewport.width) + ' × ' + Math.round(visualViewport.height) + ' · offsetTop ' + Math.round(visualViewport.offsetTop) : '没有', window.visualViewport ? 'ok' : 'warn');
+  row(S, 'Cookie 开着', navigator.cookieEnabled ? '是' : '否', yes(navigator.cookieEnabled));
+  try { localStorage.setItem('modu-check', '1'); localStorage.removeItem('modu-check'); row(S, 'localStorage', '可用', 'ok'); } catch (e) { row(S, 'localStorage', '不可用：' + e, 'no'); }
+  try { sessionStorage.setItem('modu-check', '1'); sessionStorage.removeItem('modu-check'); row(S, 'sessionStorage', '可用', 'ok'); } catch (e) { row(S, 'sessionStorage', '不可用：' + e, 'no'); }
+  row(S, 'indexedDB', window.indexedDB ? '有' : '没有', yes(window.indexedDB));
+  row(S, 'https', location.protocol === 'https:' ? '是' : location.protocol, location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost' ? 'ok' : 'warn');
+  row(S, '语言', navigator.language + ' · ' + new Date().toString().slice(0, 24));
+})();
+
+// ---------- 2. how tall the window really is (the iPhone strip) ----------
+(function(){
+  var S = '窗口高度（iPhone 底边那条）';
+  function measure(css){ var d = document.createElement('div'); d.style.cssText = 'position:fixed;left:0;top:0;width:1px;visibility:hidden;pointer-events:none;' + css; document.body.appendChild(d); var h = d.getBoundingClientRect().height, s = getComputedStyle(d); var r = { h: Math.round(h), pt: s.paddingTop, pb: s.paddingBottom }; document.body.removeChild(d); return r; }
+  var fixed = measure('top:0;bottom:0;height:auto'), lvh = measure('height:100lvh'), dvh = measure('height:100dvh'), svh = measure('height:100svh'), vh = measure('height:100vh'), pct = measure('height:100%');
+  var env = measure('padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)');
+  row(S, 'fixed top:0;bottom:0 的高度（.phone 的高度）', fixed.h + ' px');
+  row(S, '100lvh / 100dvh / 100svh / 100vh / 100%', lvh.h + ' / ' + dvh.h + ' / ' + svh.h + ' / ' + vh.h + ' / ' + pct.h);
+  row(S, 'env(safe-area-inset-top / bottom)', env.pt + ' / ' + env.pb);
+  row(S, 'document.documentElement 高度', document.documentElement.getBoundingClientRect().height + ' px');
+  var short = lvh.h > fixed.h + 2;
+  row(S, '窗口比屏幕矮', short ? ('是，矮 ' + (lvh.h - fixed.h) + ' px（WebKit 301108：文档不比窗口高时 iOS 26 把窗口缩短一个状态栏）') : '否', short ? 'warn' : 'ok');
+})();
+
+// ---------- 3. syntax ----------
+var SYNTAX = [
+  ['ES2015 箭头函数 / const / 模板字符串 / class', 'const f = (a = 1) => `x${a}`; class A {}; for (const x of []) {} let {b} = {b: 1};', '要'],
+  ['ES2017 async / await', 'async function f(){ await 1; }', '要'],
+  ['ES2018 对象展开 …', 'const {a, ...r} = {a: 1}; const o = {...r};', '要'],
+  ['ES2018 正则 后顾 (?<=…)', '/(?<=a)b/', '外卖 / 购物 两个 app 用'],
+  ['ES2018 正则 命名组 (?<n>…)', '/(?<n>a)/', '—'],
+  ['ES2019 catch 不带括号', 'try {} catch {}', '要'],
+  ['ES2020 可选链 ?. 和 ??', 'var a; a?.b ?? 1;', '要（core.js、页面）'],
+  ['ES2020 BigInt', '1n', '—'],
+  ['ES2021 ??= / ||=', 'var a; a ??= 1; a ||= 2;', '—'],
+  ['ES2022 class 字段 / #私有', 'class A { x = 1; #y = 2; static z = 3; }', '—'],
+  ['ES2020 动态 import()', 'import("x")', '形象（VRM）用']
+];
+(function(){
+  var S = '语法（编译一下，不运行）', i, ok;
+  for (i = 0; i < SYNTAX.length; i++) {
+    try { new Function(SYNTAX[i][1]); ok = true; } catch (e) { ok = false; }
+    row(S, SYNTAX[i][0], (ok ? '有' : '没有') + ' · 小手机：' + SYNTAX[i][2], ok ? 'ok' : (SYNTAX[i][2] === '—' ? 'warn' : 'no'));
+  }
+})();
+
+// ---------- 4. APIs ----------
+var APIS = [
+  ['fetch', function(){ return typeof fetch === 'function'; }, '要'],
+  ['Promise', function(){ return typeof Promise === 'function'; }, '要'],
+  ['Promise.allSettled', function(){ return typeof Promise.allSettled === 'function'; }, '—'],
+  ['URL / URLSearchParams', function(){ return typeof URL === 'function' && typeof URLSearchParams === 'function'; }, '要'],
+  ['globalThis', function(){ return typeof globalThis === 'object'; }, '要（core.js）'],
+  ['String.prototype.matchAll', function(){ return typeof ''.matchAll === 'function'; }, '要（core.js）'],
+  ['Array.prototype.at', function(){ return typeof [].at === 'function'; }, '聊天 / 文件夹用'],
+  ['String.prototype.replaceAll', function(){ return typeof ''.replaceAll === 'function'; }, '—'],
+  ['structuredClone', function(){ return typeof structuredClone === 'function'; }, '—'],
+  ['Object.hasOwn', function(){ return typeof Object.hasOwn === 'function'; }, '—'],
+  ['BroadcastChannel', function(){ return typeof BroadcastChannel === 'function'; }, '要（core.js）'],
+  ['TextEncoder / TextDecoder', function(){ return typeof TextEncoder === 'function' && typeof TextDecoder === 'function'; }, '要'],
+  ['crypto.subtle', function(){ return !!(window.crypto && crypto.subtle); }, '密码用'],
+  ['crypto.randomUUID', function(){ return !!(window.crypto && crypto.randomUUID); }, '—'],
+  ['navigator.storage', function(){ return !!navigator.storage; }, '—'],
+  ['showDirectoryPicker（电脑上的文件夹）', function(){ return typeof window.showDirectoryPicker === 'function'; }, '电脑上才有'],
+  ['navigator.clipboard', function(){ return !!navigator.clipboard; }, '—'],
+  ['navigator.share', function(){ return typeof navigator.share === 'function'; }, '—'],
+  ['speechSynthesis（朗读）', function(){ return !!window.speechSynthesis; }, '声音用'],
+  ['SpeechRecognition（听写）', function(){ return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }, '声音用'],
+  ['Notification', function(){ return typeof Notification === 'function'; }, '—'],
+  ['serviceWorker', function(){ return 'serviceWorker' in navigator; }, '不要了'],
+  ['IntersectionObserver / ResizeObserver', function(){ return typeof IntersectionObserver === 'function' && typeof ResizeObserver === 'function'; }, '形象用'],
+  ['AbortController', function(){ return typeof AbortController === 'function'; }, '—'],
+  ['PointerEvent', function(){ return typeof PointerEvent === 'function'; }, '要（安全模式的 5 下）'],
+  ['WebGL2（形象）', function(){ var c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }, '形象用'],
+  ['AudioContext', function(){ return !!(window.AudioContext || window.webkitAudioContext); }, '一起听用'],
+  ['CSS.supports', function(){ return !!(window.CSS && CSS.supports); }, '—']
+];
+(function(){
+  var S = '浏览器功能', i, ok;
+  for (i = 0; i < APIS.length; i++) {
+    try { ok = !!APIS[i][1](); } catch (e) { ok = false; }
+    row(S, APIS[i][0], (ok ? '有' : '没有') + ' · 小手机：' + APIS[i][2], ok ? 'ok' : (/^要/.test(APIS[i][2]) ? 'no' : 'warn'));
+  }
+})();
+
+// ---------- 5. CSS ----------
+var CSSF = [
+  ['inset: 0（每个屏幕的位置）', 'inset', '0', '要（Chrome 87）'],
+  ['max() / min()', 'padding', 'max(1px, 2px)', '要（底边）'],
+  ['env(safe-area-inset-bottom)', 'padding', 'env(safe-area-inset-bottom, 0px)', '底边'],
+  ['100lvh / 100dvh', 'height', '100lvh', 'iPhone 桌面 app 的修正用'],
+  ['zoom', 'zoom', '1', '电脑上才用'],
+  ['backdrop-filter（毛玻璃）', 'backdrop-filter', 'blur(1px)', '好看用'],
+  ['-webkit-backdrop-filter', '-webkit-backdrop-filter', 'blur(1px)', '好看用'],
+  ['color-mix()', 'color', 'color-mix(in srgb, red, blue)', '颜色（Chrome 111）'],
+  ['aspect-ratio', 'aspect-ratio', '1', '—'],
+  ['overscroll-behavior', 'overscroll-behavior', 'contain', '—'],
+  ['touch-action: manipulation', 'touch-action', 'manipulation', '—'],
+  ['isolation: isolate', 'isolation', 'isolate', '—'],
+  ['-webkit-touch-callout（认 iOS）', '-webkit-touch-callout', 'none', 'iPhone 才有']
+];
+(function(){
+  var S = 'CSS', i, ok, sup = window.CSS && CSS.supports;
+  if (!sup) { row(S, 'CSS.supports', '没有，查不了', 'warn'); return; }
+  for (i = 0; i < CSSF.length; i++) {
+    try { ok = CSS.supports(CSSF[i][1], CSSF[i][2]); } catch (e) { ok = false; }
+    row(S, CSSF[i][0], (ok ? '有' : '没有') + ' · 小手机：' + CSSF[i][3], ok ? 'ok' : (/^要/.test(CSSF[i][3]) ? 'no' : 'warn'));
+  }
+  var sel = [[':has()', 'selector(:has(a))', '细节'], [':is() / :where()', 'selector(:is(a))', '—']];
+  for (i = 0; i < sel.length; i++) { try { ok = CSS.supports(sel[i][1]); } catch (e) { ok = false; } row(S, sel[i][0], (ok ? '有' : '没有') + ' · 小手机：' + sel[i][2], ok ? 'ok' : 'warn'); }
+  try { ok = matchMedia('(display-mode: standalone)').media !== 'not all'; } catch (e) { ok = false; }
+  row(S, '@media (display-mode)', ok ? '认得' : '不认得', ok ? 'ok' : 'warn');
+})();
+
+// ---------- 6. what the site serves, and whether it compiles here ----------
+var FILES = ['index.html', 'safe.js', 'layout.css', 'splash.css', 'skins/rouguang.css', 'vendor/fonts/fonts.css', 'core.js', 'drafts.js', 'lock.js', 'apps/registry.js', 'backup.js', 'look.js', 'kaomoji.js', 'voice.js', 'life.js', 'scheduler.js', 'apps/index.json', 'words.txt', 'kaomoji.txt', 'app.webmanifest', 'sw.js', 'brand/modu-mark.svg'];
+var S6 = '网站给的文件（这里再编译一遍）';
+function compile(name, text){
+  if (!/\.js$/.test(name)) return '';
+  try { new Function(text); return '编译通过'; } catch (e) { return '编译不过：' + e.name + ': ' + e.message; }
+}
+function inlineScripts(html){
+  var re = /<script(?![^>]*\bsrc=)(?![^>]*type="importmap")[^>]*>([\s\S]*?)<\/script>/g, m, n = 0, bad = [];
+  while ((m = re.exec(html))) { n++; try { new Function(m[1]); } catch (e) { bad.push('第 ' + n + ' 段 ' + e.name + ': ' + e.message); } }
+  return n + ' 段内嵌脚本' + (bad.length ? '，编译不过：' + bad.join('；') : '，都编译通过');
+}
+function fetchOne(name, done){
+  var t = Date.now();
+  var p;
+  try { p = fetch(name, { credentials: 'same-origin', cache: 'no-store' }); } catch (e) { row(S6, name, 'fetch 抛错：' + e, 'no'); done(); return; }
+  p.then(function(r){
+    var ct = r.headers.get('content-type') || '?';
+    return r.text().then(function(text){
+      var html = /^\s*<(!doctype|html)/i.test(text) && !/\.html$/.test(name), ms = Date.now() - t;
+      var what = r.status + ' · ' + ct.split(';')[0] + ' · ' + text.length + ' 字 · ' + ms + ' ms';
+      if (html) { row(S6, name, what + ' · 给的是一个网页，不是这个文件（登录页？）', 'no'); done(); return; }
+      if (!r.ok) { row(S6, name, what, 'no'); done(); return; }
+      var extra = '', m;
+      if (name === 'index.html') { m = /<meta name="modu-version" content="([^"]+)">/.exec(text); extra = ' · 版本 ' + (m ? m[1] : '没写') + ' · ' + inlineScripts(text) + (text.indexOf('safe.js') >= 0 ? '' : ' · 没有 safe.js'); }
+      if (name === 'sw.js') extra = text.indexOf('unregister') >= 0 ? ' · 只会把旧的后台程序去掉' : ' · 是旧的那个';
+      var c = compile(name, text);
+      row(S6, name, what + (c ? ' · ' + c : '') + extra, /编译不过/.test(c) ? 'no' : 'ok');
+      if (name === 'apps/index.json') { try { var ids = JSON.parse(text); ids.forEach(function(id){ queue.push('apps/' + id + '/app.js'); }); } catch (e) { row(S6, 'apps/index.json', '读不出来：' + e, 'no'); } }
+      done();
+    });
+  })['catch'](function(e){ row(S6, name, '拿不到：' + e, 'no'); done(); });
+}
+// the default companion's card (samples/char_zh.png): what the site serves, and whether the PNG still carries the
+// card text (a tEXt/iTXt chunk named chara or ccv3). A fresh install's 聊天 gets him from this file at the first start.
+function cardFile(then){
+  var S = '默认伙伴 char 的卡片（samples/char_zh.png）', name = '../samples/char_zh.png', t = Date.now(), p;
+  try { p = fetch(name, { credentials: 'same-origin', cache: 'no-store' }); } catch (e) { row(S, name, 'fetch 抛错：' + e, 'no'); then(); return; }
+  p.then(function(r){
+    var ct = r.headers.get('content-type') || '?';
+    return r.arrayBuffer().then(function(buf){
+      var b = new Uint8Array(buf), ms = Date.now() - t, what = r.status + ' · ' + ct.split(';')[0] + ' · ' + b.length + ' 字节 · ' + ms + ' ms';
+      if (!r.ok) { row(S, name, what, 'no'); then(); return; }
+      if (!(b[0] === 137 && b[1] === 80 && b[2] === 78 && b[3] === 71)) { row(S, name, what + ' · 不是 PNG（登录页？）', 'no'); then(); return; }
+      var i = 8, keys = [];
+      while (i + 8 <= b.length) {
+        var len = (b[i] << 24 | b[i+1] << 16 | b[i+2] << 8 | b[i+3]) >>> 0, type = String.fromCharCode(b[i+4], b[i+5], b[i+6], b[i+7]);
+        if (type === 'tEXt' || type === 'iTXt') { var k = '', j = i + 8; while (j < i + 8 + len && b[j] !== 0 && k.length < 40) { k += String.fromCharCode(b[j]); j++; } keys.push(k + '(' + len + ')'); }
+        i += 12 + len;
+      }
+      var has = /\b(chara|ccv3)\(/.test(keys.join(' '));
+      row(S, name, what + ' · 文字块：' + (keys.length ? keys.join(', ') : '没有') + (has ? ' · 卡片在' : ' · 卡片文字不在（图片被压过？）'), has ? 'ok' : 'no');
+      then();
+    });
+  })['catch'](function(e){ row(S, name, '拿不到：' + e, 'no'); then(); });
+}
+var queue = FILES.slice(), running = 0, filesDone;
+function pump(){
+  while (running < 3 && queue.length) { running++; fetchOne(queue.shift(), function(){ running--; if (!queue.length && !running && filesDone) filesDone(); else pump(); }); }
+  if (!queue.length && !running && filesDone) filesDone();
+}
+
+// ---------- 7. old service workers and caches ----------
+function workers(then){
+  var S = '旧的后台程序（service worker）和缓存';
+  if (!('serviceWorker' in navigator)) { row(S, 'service worker', '这个浏览器没有', 'ok'); then(); return; }
+  var p;
+  try { p = navigator.serviceWorker.getRegistrations(); } catch (e) { row(S, 'service worker', '查不了：' + e, 'warn'); then(); return; }
+  p.then(function(rs){
+    if (!rs.length) row(S, '已登记的', '没有', 'ok');
+    rs.forEach(function(r){ var w = r.active || r.waiting || r.installing; row(S, '已登记的', r.scope + ' · ' + (w ? w.scriptURL.split('/').pop() + ' · ' + w.state : '空') + '（旧版装的；新的 sw.js 会把它去掉）', 'warn'); });
+    row(S, '这一页被它管着', navigator.serviceWorker.controller ? '是' : '否', navigator.serviceWorker.controller ? 'warn' : 'ok');
+    if (window.caches && caches.keys) return caches.keys().then(function(ks){ row(S, 'caches', ks.length ? ks.join(', ') : '没有', ks.length ? 'warn' : 'ok'); });
+  })['catch'](function(e){ row(S, 'service worker', '查不了：' + e, 'warn'); }).then(then, then);
+}
+
+// ---------- run ----------
+var state = document.getElementById('state');
+filesDone = function(){ filesDone = null; cardFile(function(){ workers(function(){ state.textContent = '检查完了。点上面的「复制全部」，把文字发给我们。'; row('结束', '检查完了', new Date().toTimeString().slice(0, 8)); }); }); };
+pump();
+
+// 复制全部
+document.getElementById('copy').onclick = function(){
+  var btn = this, text = raw.textContent;
+  function done(){ btn.textContent = '复制好了'; }
+  function fallback(){ try { var r = document.createRange(); r.selectNodeContents(raw); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); if (document.execCommand('copy')) done(); else btn.textContent = '请长按下面的文字复制'; } catch (e) { btn.textContent = '请长按下面的文字复制'; } }
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, fallback); return; } } catch (e) {}
+  fallback();
+};
+
+// 在下面打开小手机：the real page in a frame on this origin; after a while, what its own safe.js kept (ModuSafe.errors),
+// whether the phone showed (.phone.ready), and what index.html's own line says (ModuBootFailed)
+document.getElementById('boot').onclick = function(){
+  var btn = this, S = '小手机在这一页里打开的结果'; btn.disabled = true;
+  document.getElementById('frameBox').hidden = false;
+  var f = document.getElementById('frame'), t = Date.now(), readyAt = 0;
+  f.src = 'index.html#home';
+  var tick = setInterval(function(){
+    var W, D, phone, ready, errs, failed, note;
+    try { W = f.contentWindow; D = f.contentDocument; } catch (e) { row(S, '看不进去', String(e), 'no'); clearInterval(tick); return; }
+    if (!D) return;
+    phone = D.getElementById('phone'); ready = phone && /\bready\b/.test(phone.className);
+    errs = W.ModuSafe && W.ModuSafe.errors ? W.ModuSafe.errors : null; failed = W.ModuBootFailed; note = D.getElementById('bootStuck') || D.getElementById('bootFail');
+    var s = Math.round((Date.now() - t) / 1000);
+    if (ready) {
+      // then: did the first start put char in 聊天 (ModuCore.contacts)? firstRun runs after the phone shows, so wait up to 15 s
+      var cs = W.ModuCore && W.ModuCore.contacts, n = cs ? cs.length : -1;
+      if (!readyAt) { readyAt = s; row(S, s + ' s', '小手机打开了（.phone.ready）' + (errs && errs.length ? '，但有报错：' + errs.join(' | ') : ''), errs && errs.length ? 'warn' : 'ok'); }
+      if (n > 0 || s - readyAt >= 15) { row(S, '聊天里', n < 0 ? '看不到名单（ModuCore.contacts 不在）' : n > 0 ? n + ' 个人（' + cs.map(function(c){ return c.name; }).join('、') + '）' : '没有人：第一次放进 char 失败了（看上面 Array.at 和 Chrome 内核版本）', n > 0 ? 'ok' : 'no'); clearInterval(tick); }
+      return;
+    }
+    if (failed) { row(S, s + ' s', '没有到齐的文件：' + failed.join(', '), 'no'); clearInterval(tick); return; }
+    if (errs && errs.length) { row(S, s + ' s', '报错：' + errs.join(' | '), 'no'); clearInterval(tick); return; }
+    if (s >= 30) { row(S, s + ' s', '没打开，也没有报错 · readyState ' + D.readyState + ' · ModuSafe ' + (W.ModuSafe ? '在' : '不在') + ' · ModuCore ' + (W.ModuCore ? '在' : '不在') + ' · ModuApps ' + (W.ModuApps ? '在' : '不在') + (note ? ' · 页面自己的提示：' + note.textContent.slice(0, 200) : ''), 'no'); clearInterval(tick); }
+  }, 1000);
+};
+
+// 清掉：every service worker registration and cache on this origin, then the list again
+document.getElementById('clean').onclick = function(){
+  var btn = this, S = '清理'; btn.disabled = true;
+  var p = Promise.resolve();
+  if ('serviceWorker' in navigator) p = p.then(function(){ return navigator.serviceWorker.getRegistrations().then(function(rs){ return Promise.all(rs.map(function(r){ return r.unregister(); })).then(function(xs){ row(S, '去掉的后台程序', xs.length, 'ok'); }); }); });
+  if (window.caches && caches.keys) p = p.then(function(){ return caches.keys().then(function(ks){ return Promise.all(ks.map(function(k){ return caches['delete'](k); })).then(function(){ row(S, '清掉的缓存', ks.length, 'ok'); }); }); });
+  p.then(function(){ row(S, '清好了', '再从桌面图标或地址打开一次小手机', 'ok'); }, function(e){ row(S, '清不了', String(e), 'no'); });
+};
+})();
+</script>
+</body>
+</html>

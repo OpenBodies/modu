@@ -1,0 +1,33 @@
+/* 日历: only inside its own screen; colours are skin tokens */
+#s-app-calendar .a-calendar-month{padding:10px 12px 12px}
+#s-app-calendar .a-calendar-nav{display:flex;align-items:center;justify-content:space-between;padding:2px 2px 8px;font-size:15px;color:var(--m-fg)}
+#s-app-calendar .a-calendar-nav b{font-weight:600}
+#s-app-calendar .a-calendar-nav button{font-size:22px;line-height:1;padding:0 10px;color:var(--m-fg2)}
+#s-app-calendar .a-calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px 2px;text-align:center}
+#s-app-calendar .a-calendar-h{font-size:11px;color:var(--m-muted);padding:2px 0}
+#s-app-calendar .a-calendar-d{font-size:14px;padding:7px 0;border-radius:999px;position:relative;color:var(--m-fg)}
+#s-app-calendar .a-calendar-d.today{color:var(--m-accent);font-weight:700}
+#s-app-calendar .a-calendar-d.sel{background:var(--m-accent);color:var(--m-accent-fg);font-weight:600}
+#s-app-calendar .a-calendar-d.has:after{content:"";position:absolute;left:50%;bottom:2px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--m-accent)}
+#s-app-calendar .a-calendar-d.sel.has:after{background:var(--m-accent-fg)}
+#s-app-calendar .a-calendar-it > span{flex:1 1 auto;min-width:0;color:var(--m-fg)}
+#s-app-calendar .a-calendar-it small{display:block;font-size:12px;color:var(--m-muted)}
+#s-app-calendar .a-calendar-x{font-size:13px;flex:0 0 auto}
+#s-app-calendar .a-calendar-none > span{color:var(--m-muted);font-size:14px}
+#s-app-calendar .a-calendar-add input{text-align:left;color:var(--m-fg);font-size:16px}
+#s-app-calendar .a-calendar-add .val{color:var(--m-accent);font-weight:600;flex:0 0 auto}
+/* each plan has a time, or 全天 */
+#s-app-calendar .a-calendar-it > span.a-calendar-at{flex:0 0 auto;min-width:46px;margin-right:12px;font-size:14px;font-weight:600;color:var(--m-fg);font-variant-numeric:tabular-nums}
+#s-app-calendar .a-calendar-it > span.a-calendar-at.allday{font-size:12.5px;font-weight:500;color:var(--m-muted)}
+#s-app-calendar .a-calendar-when{gap:10px}
+#s-app-calendar .a-calendar-when > span{flex:1 1 auto;color:var(--m-fg2);font-size:14px}
+#s-app-calendar .a-calendar-when input{flex:0 0 auto;width:auto;min-width:92px;text-align:right;font-size:16px;color:var(--m-fg);background:transparent;border:0;outline:none;font-variant-numeric:tabular-nums}
+/* 全天 is a switch row; off, a start (and, if she adds one, an end) shows under it */
+#s-app-calendar .a-calendar-allday > span:first-child{color:var(--m-fg2);font-size:14px}
+#s-app-calendar .a-calendar-endadd{flex:0 0 auto;font-size:13.5px;color:var(--m-accent);font-weight:600}
+#s-app-calendar .a-calendar-endx{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--m-soft);color:var(--m-muted);font-size:15px;line-height:26px;text-align:center}
+#s-app-calendar .a-calendar-it > span{text-align:left}
+/* 告诉他, she shows him this one plan; 已告诉 once he has seen it */
+#s-app-calendar .a-calendar-tell{font-size:12.5px;flex:0 0 auto;margin-right:10px;color:var(--m-accent)}
+#s-app-calendar .a-calendar-tell.on{color:var(--m-muted)}
+#s-app-calendar .a-calendar-allday.on{border-bottom:0}   /* the time rows under it are hidden: it is the last row */

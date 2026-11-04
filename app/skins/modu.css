@@ -1,0 +1,169 @@
+/* Modu 小手机 skin: Modu, designed from the Modu logo (app/brand/).
+   The logo's ideas, carried into the phone:
+   - solid blocks: cards, buttons and app tiles are square-ish blocks with a hard shaded edge (the cube's
+     dark face), never a soft blur;
+   - the lifted piece: small gold squares float just off a corner (the U's tip, the gold block) to mark
+     what is new or alive: tags, titles, his typing;
+   - square, solid type: Rubik for headings, Rubik Mono One (the logo's font) for the clock.
+   Colours: the darkest is the MODU letters (#4a4b4f); the greys are the cube's faces; the gold is the
+   lifted block, used sparingly. This is one complete file over ../layout.css (it imports no other
+   skin): it sets the --m-* tokens and the look, never positions or sizes. */
+
+:root{
+  /* his mood's colour around his picture in a call with no VRM */
+  --m-mood-joy:#e2a94f; --m-mood-sadness:#7f97b8; --m-mood-anger:#c8705c; --m-mood-surprise:#dcc163; --m-mood-relief:#8fb38c; --m-mood-neutral:#cdbfa8;
+  --m-bg:#f9f8f6; --m-fg:#4a4b4f; --m-fg2:#6a6b6c; --m-muted:#a8a8a7;
+  --m-me:#e2cfba; --m-me-fg:#4a4b4f; --m-ta:#ffffff; --m-ta-fg:#4a4b4f;
+  --m-soft:#f1f0ed; --m-line:rgba(74,75,79,.12); --m-ink:#4a4b4f;
+  --m-wall:#f1f0ed; --m-dock:#ffffff;
+  --m-shade:rgba(0,0,0,.05); --m-scrim:rgba(40,40,42,.28); --m-desk:#e9e7e2; --m-frame:#2a2a2c;
+  --m-glass:#ffffff; --m-glass-fg:#4a4b4f; --m-glass-line:transparent; --m-blur:0px;
+  --m-on-wall:#4a4b4f; --m-on-wall2:#6a6b6c;
+  --m-accent:#b7a08a; --m-accent-fg:#ffffff; --m-here:#b7a08a; --m-asleep:#a8a8a7; --m-busy:#d1bca7; --m-danger:#c8665a;
+  --m-call-bg:#e9e7e2; --m-call-bg-solid:#e9e7e2; --m-call-fg:#4a4b4f;
+  --m-art:linear-gradient(135deg,#e2cfba 0 50%,#b7a08a 50% 100%); --m-art-disc:#4a4b4f; --m-art-ring:#3a3b3e;
+  --m-edge:#dcdbd8; --m-edge-dk:#c1c0be;               /* the cube's shaded faces, as block edges */
+  --m-gold:#b7a08a; --m-gold-lt:#e2cfba; --m-gold-md:#d1bca7; --m-gold-dk:#a0866f; --m-gold-wash:#f3ebe1;
+  --m-strong:#4a4b4f; --m-strong-fg:#f9f8f6;
+  --m-radius:8px; --m-bubble-radius:10px;
+  --m-display:"Rubik","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --m-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --m-logo:"Rubik Mono One","Rubik",sans-serif; --m-clock:var(--m-logo);
+  --m-font:"Rubik","Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
+}
+:root[data-bubble="square"]{ --m-bubble-radius:4px; }
+:root[data-font="serif"]{ --m-font:"Noto Serif SC","Songti SC",serif; }
+:root[data-night="on"]{
+  --m-bg:#262628; --m-fg:#ecebe7; --m-fg2:#c1c0be; --m-muted:#8a8a8b;
+  --m-me:#a0866f; --m-me-fg:#f9f8f6; --m-ta:#323235; --m-ta-fg:#ecebe7;
+  --m-soft:#1e1e20; --m-line:rgba(236,235,231,.12); --m-ink:#dcdbd8;
+  --m-wall:#1e1e20; --m-dock:#323235; --m-edge:#141415; --m-edge-dk:#0e0e0f;
+  --m-gold-wash:#3a332c; --m-strong:#dcdbd8; --m-strong-fg:#262628; --m-desk:#121213; color-scheme:dark;
+  --m-glass:#323235; --m-glass-fg:#ecebe7; --m-on-wall:#ecebe7; --m-on-wall2:#c1c0be; --m-scrim:rgba(0,0,0,.5); --m-shade:rgba(0,0,0,.3);
+  --m-accent:#d1bca7; --m-accent-fg:#262628; --m-here:#e2b77a; --m-asleep:#77777a; --m-call-bg:#1e1e20; --m-call-bg-solid:#1e1e20; --m-call-fg:#ecebe7;
+}
+@media (prefers-color-scheme: dark){
+  :root[data-night="auto"]{
+    --m-bg:#262628; --m-fg:#ecebe7; --m-fg2:#c1c0be; --m-muted:#8a8a8b;
+    --m-me:#a0866f; --m-me-fg:#f9f8f6; --m-ta:#323235; --m-ta-fg:#ecebe7;
+    --m-soft:#1e1e20; --m-line:rgba(236,235,231,.12); --m-ink:#dcdbd8;
+    --m-wall:#1e1e20; --m-dock:#323235; --m-edge:#141415; --m-edge-dk:#0e0e0f;
+    --m-gold-wash:#3a332c; --m-strong:#dcdbd8; --m-strong-fg:#262628; --m-desk:#121213; color-scheme:dark;
+    --m-glass:#323235; --m-glass-fg:#ecebe7; --m-on-wall:#ecebe7; --m-on-wall2:#c1c0be; --m-scrim:rgba(0,0,0,.5); --m-shade:rgba(0,0,0,.3);
+    --m-accent:#d1bca7; --m-accent-fg:#262628; --m-here:#e2b77a; --m-asleep:#77777a; --m-call-bg:#1e1e20; --m-call-bg-solid:#1e1e20; --m-call-fg:#ecebe7;
+  }
+}
+
+/* ---- the block: a hard shaded edge instead of a soft shadow ---- */
+.w,.app i,.contact,.drop,.mcard,.group,.sticker,.b,.typing,.dock,.teaser .face,.sheet .opts button{box-shadow:none}
+.w,.contact,.group,.mcard,.dock,.b.ta,.typing,.sticker,.dev,.presence,.lk-note,.tabs,.caption,.call-say,.selfview{box-shadow:3px 3px 0 var(--m-edge)}
+.presence,.lk-note,.caption,.call-say,.selfview{background:var(--m-glass);color:var(--m-glass-fg)}
+.call-ctl button i{background:var(--m-ta);color:var(--m-ink);border-radius:10px;box-shadow:3px 3px 0 var(--m-edge-dk)}
+.call-ctl .hang i{background:var(--m-danger);color:#fff;box-shadow:3px 3px 0 var(--m-gold-dk)}
+.tabs{border-radius:8px;background:var(--m-ta)}.tabs button{border-radius:5px}.tabs button.on{background:var(--m-strong);color:var(--m-strong-fg)}
+.dev .pic{border-radius:6px;background:var(--m-gold-wash);color:var(--m-gold-dk)}
+.chip,.moodchip{border-radius:4px}
+.moodchip{background:var(--m-ta);color:var(--m-fg);box-shadow:2px 2px 0 var(--m-edge)}
+.w.him .days{border-radius:3px}
+.w.music .art{border-radius:4px}
+.look .shot{border-radius:6px}
+.app i{box-shadow:3px 3px 0 var(--m-edge-dk);border-radius:6px}
+.btn,.inp .send{background:var(--m-strong);color:var(--m-strong-fg);border-radius:6px;box-shadow:3px 3px 0 var(--m-gold);transition:transform .08s,box-shadow .08s}
+.btn:active,.inp .send:active,.app:active i{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--m-gold)}
+
+/* ---- the lifted piece: a small gold square just off a corner ---- */
+.bar .title,.imp h1{position:relative;display:inline-block}
+.bar .title::after,.imp h1::after{content:"";position:absolute;width:.3em;height:.3em;background:var(--m-gold);right:-.42em;top:.02em}
+.app .tag{top:-9px;right:-2px;border-radius:2px;background:var(--m-gold);color:#fff;font-size:10px;padding:1px 5px}
+.app.soon .tag{background:var(--m-soft);color:var(--m-muted);border:1px solid var(--m-line)}
+
+/* ---- type ---- */
+.bar .title,.bar .who{font-family:var(--m-display);font-weight:600;letter-spacing:.01em}
+.imp h1{font-family:var(--m-display);font-weight:700;font-size:28px;letter-spacing:.02em}
+.contact b,.teaser h2,.sheet h3{font-family:var(--m-display);font-weight:600}
+
+/* ---- 搬家 ---- */
+.brand{display:block;margin-top:26px}
+.brand img{height:26px;width:auto;display:block}
+.imp{background:var(--m-wall)}
+.imp h1{margin-top:22px;align-self:flex-start}
+.drop{border:2px dashed var(--m-edge-dk);border-radius:var(--m-radius);background:var(--m-ta)}
+.drop .ic{color:var(--m-gold-dk)}
+.drop.over{background:var(--m-gold-wash);border-color:var(--m-gold)}
+.src span{border-radius:4px}
+.contact{border-radius:var(--m-radius);border-left:6px solid var(--m-gold)}
+.av{border-radius:8px;background-color:var(--m-gold-lt)}
+.contact .av{border-radius:10px}
+
+/* ---- 桌面: blocks stacked like the cube ---- */
+
+.wrow{gap:14px}
+.w{border-radius:var(--m-radius)}
+.w.big{background:var(--m-strong);color:var(--m-strong-fg);box-shadow:3px 3px 0 var(--m-gold);position:relative;padding:14px 16px}
+.w .clock{font-family:var(--m-logo);font-size:46px;letter-spacing:-.02em;color:var(--m-strong-fg)}
+.w.big .sub,.w.big .wx,.w.big .greet{color:var(--m-edge-dk)}
+.w{border-radius:var(--m-radius)}
+.lk-time{font-family:var(--m-logo);font-size:72px;font-weight:400}
+.presence,.lk-note{border-radius:6px}
+.w.cal{background:var(--m-gold-wash);box-shadow:3px 3px 0 var(--m-gold-md)}
+.w.cal small{color:var(--m-gold-dk)}
+.grid{gap:18px 8px}
+.app i{width:56px;height:56px;background:var(--m-ta);color:var(--m-ink)}
+.app.soon i{background:var(--m-soft);box-shadow:3px 3px 0 var(--m-edge);opacity:1;color:var(--m-muted)}
+.dock{border-radius:var(--m-radius);background:var(--m-dock);padding:10px 8px}
+.dock .app i{box-shadow:none;background:transparent}
+
+/* ---- 聊天 ---- */
+.chat{background:var(--m-soft);gap:12px}
+.b{border-radius:var(--m-bubble-radius)}
+.b.ta{border-bottom-left-radius:2px}
+.b.me{border-bottom-right-radius:2px;box-shadow:3px 3px 0 var(--m-gold-md)}
+.b.me .act{color:var(--m-fg2);opacity:1}
+.stamp{font-family:var(--m-display);letter-spacing:.04em}
+.sticker{border-radius:var(--m-radius);color:var(--m-gold-dk)}
+.typing{border-radius:var(--m-bubble-radius);padding:12px 14px;line-height:0}
+.typing span{display:inline-block;width:7px;height:7px;margin:0 3px;background:var(--m-gold);color:transparent;font-size:0;animation:hop 1s infinite both}
+.typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
+@keyframes hop{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+.inp input,.inp textarea{border-radius:6px}
+.bar{border-bottom:2px solid var(--m-edge)}
+
+/* ---- 聊天 list: each person is a block ---- */
+.clist{background:var(--m-wall);padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.citem{background:var(--m-ta);border:0;border-radius:var(--m-radius);box-shadow:3px 3px 0 var(--m-edge);padding:12px 14px;flex-shrink:0}
+.citem.on{box-shadow:3px 3px 0 var(--m-gold-md)}
+.citem b{font-family:var(--m-display);font-weight:600}
+.citem .t{font-family:var(--m-display);letter-spacing:.03em}
+
+/* ---- 记忆 ---- */
+.mem{gap:12px}
+.mcard{border-radius:var(--m-radius)}
+.mcard.sum{background:var(--m-gold-wash);color:var(--m-fg);box-shadow:3px 3px 0 var(--m-gold-md)}
+.mcard.sum small{color:var(--m-gold-dk);opacity:1}
+.mcard small{font-family:var(--m-display);letter-spacing:.03em}
+
+/* ---- 虚拟形象 ---- */
+.teaser{background:var(--m-ta);border-radius:var(--m-radius);box-shadow:3px 3px 0 var(--m-edge)}
+.teaser .face{border-radius:6px;box-shadow:5px 5px 0 var(--m-edge-dk)}
+.teaser .face:after{border-radius:6px}
+.teaser .lock{border-radius:8px;background:var(--m-gold);color:#fff;box-shadow:3px 3px 0 var(--m-gold-dk)}
+
+/* ---- 美化 / 声音 / 设置 ---- */
+.list{gap:14px}
+.group{border-radius:var(--m-radius)}
+.gtitle{font-family:var(--m-display);font-weight:600;color:var(--m-fg2)}
+.choice .dot{border-radius:3px}
+.choice.on .dot{border-color:var(--m-strong)}
+.switch{border-radius:5px}
+.switch:after{border-radius:3px}
+.switch.on{background:var(--m-gold)}
+
+/* ---- sheets ---- */
+.sheet{border-radius:12px 12px 0 0;border-top:3px solid var(--m-gold)}
+.sheet h3 .tag{border-radius:3px}
+.toast{border-radius:6px;background:var(--m-strong);color:var(--m-strong-fg)}
+
+/* 他的房间: a busy, warm picture, so text on it is light with a soft shadow */
+:root[data-wall="room"]{ --m-on-wall:#fff8ee; --m-on-wall2:#f6e8d6; --m-label-shadow:0 1px 8px rgba(30,20,10,.75); }
+:root[data-wall="room"] .wp-img::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(30,20,10,.38),rgba(30,20,10,.08) 32%,rgba(30,20,10,0) 55%,rgba(30,20,10,.3))}
+:root[data-wall="room"] .w.big,:root[data-wall="room"] .lk{text-shadow:0 1px 10px rgba(30,20,10,.55)}

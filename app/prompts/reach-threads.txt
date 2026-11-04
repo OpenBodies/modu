@@ -1,0 +1,4 @@
+# reach-threads v1
+# what is still open from her side, when anything is
+# vars: threads
+Still open from her side (you may ask how one of them is going or went, if it fits; at most one, never as a list): {{threads}}

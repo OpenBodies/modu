@@ -1,0 +1,28 @@
+/* 信箱: only inside its own screen, only skin tokens */
+#s-app-mail .a-mail-body{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--m-page,var(--m-soft))}
+#s-app-mail .a-mail-body .mem{flex:1}
+#s-app-mail .a-mail-card{display:flex;flex-direction:column;gap:4px;border-left:3px solid transparent}
+#s-app-mail .a-mail-card.him{border-left-color:var(--m-accent)}
+#s-app-mail .a-mail-head{display:flex;align-items:baseline;gap:8px}
+#s-app-mail .a-mail-head b{font-family:var(--m-display);font-weight:600;font-size:15px}
+#s-app-mail .a-mail-head small{margin:0 0 0 auto}
+#s-app-mail .a-mail-new{font-style:normal;font-size:10.5px;line-height:1.6;padding:0 7px;border-radius:999px;background:var(--m-accent);color:var(--m-accent-fg)}
+#s-app-mail .a-mail-ex{opacity:.78;font-size:13.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#s-app-mail .a-mail-wait{display:flex;align-items:center;gap:12px;color:var(--m-muted)}
+#s-app-mail .a-mail-wait b{display:block;font-weight:500;color:var(--m-ta-fg)}
+#s-app-mail .a-mail-wait small{margin-top:0}
+#s-app-mail .a-mail-wait.held{justify-content:space-between}
+#s-app-mail .a-mail-retry{color:var(--m-fg2);font-size:13.5px}
+#s-app-mail .a-mail-dot{flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:var(--m-accent);animation:a-mail-pulse 1.6s ease-in-out infinite}
+@keyframes a-mail-pulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:none}}
+#s-app-mail .a-mail-sheet{flex:1;min-height:0;display:flex;flex-direction:column;margin:12px 14px 10px;background:var(--m-ta);color:var(--m-ta-fg);border-radius:var(--m-radius);box-shadow:0 6px 18px var(--m-shade);overflow:hidden}
+#s-app-mail .a-mail-meta{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:16px 20px 4px}
+#s-app-mail .a-mail-meta b{font-family:var(--m-display);font-weight:600;font-size:15.5px}
+#s-app-mail .a-mail-meta small{color:var(--m-muted);font-size:12px}
+#s-app-mail .a-mail-paper{flex:1;min-height:0;overflow-y:auto;box-sizing:border-box;width:100%;margin:0;border:0;outline:none;resize:none;background-color:transparent;color:inherit;padding:6px 20px 20px;font-family:var(--m-display);font-size:16px;line-height:30px;white-space:pre-wrap;word-break:break-word;
+  background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 29px,var(--m-line) 29px,var(--m-line) 30px);background-position:0 6px}
+#s-app-mail .a-mail-paper::placeholder{color:var(--m-muted)}
+#s-app-mail .a-mail-actions{padding:0 14px 18px;flex:0 0 auto}
+/* 寄出 clear of the iPhone home indicator */
+@media (max-width:500px){ #s-app-mail .a-mail-actions{padding-bottom:max(18px,env(safe-area-inset-bottom,0px))} }
+@media (prefers-reduced-motion:reduce){ #s-app-mail .a-mail-dot{animation:none} }

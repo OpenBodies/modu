@@ -1,0 +1,25 @@
+/* 五子棋: styles for its own screen only. Colours come from the skin's tokens.
+   The board is 13 × 13 and fits a 375-wide screen; what he says wraps in the strip under it. */
+#s-app-gomoku .a-gmk-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:12px 14px}
+#s-app-gomoku .a-gmk-status{font-size:15px;color:var(--m-fg);min-width:0;overflow-wrap:anywhere}
+#s-app-gomoku .a-gmk-score{flex:0 0 auto;font-size:12px;color:var(--m-muted)}
+#s-app-gomoku .a-gmk-board{display:grid;grid-template-columns:repeat(13,1fr);width:min(100% - 24px,360px);aspect-ratio:1;margin:4px auto 12px;padding:4px;box-sizing:border-box;border-radius:var(--m-radius);background:var(--m-soft)}
+#s-app-gomoku .a-gmk-pt{position:relative;padding:0;margin:0;min-width:0;aspect-ratio:1;border:0;background:transparent;cursor:pointer}
+#s-app-gomoku .a-gmk-pt::before{content:"";position:absolute;inset:0;background:linear-gradient(var(--m-line),var(--m-line)) center/100% 1px no-repeat,linear-gradient(var(--m-line),var(--m-line)) center/1px 100% no-repeat}
+#s-app-gomoku .a-gmk-pt.bk::after,#s-app-gomoku .a-gmk-pt.wh::after{content:"";position:absolute;inset:9%;border-radius:50%;box-sizing:border-box}
+#s-app-gomoku .a-gmk-pt.bk::after{background:var(--m-fg)}
+#s-app-gomoku .a-gmk-pt.wh::after{background:var(--m-bg);border:1.5px solid var(--m-fg)}
+#s-app-gomoku .a-gmk-pt.last::after{box-shadow:0 0 0 2px var(--m-accent)}
+#s-app-gomoku .a-gmk-pt[disabled]{cursor:default}
+#s-app-gomoku .a-gmk-strip{display:flex;flex-direction:column;gap:8px;padding:12px 14px;min-height:44px}
+#s-app-gomoku .a-gmk-his{display:flex;flex-direction:column;gap:2px;min-width:0}
+#s-app-gomoku .a-gmk-his small,#s-app-gomoku .a-gmk-quiet{font-size:11.5px;color:var(--m-muted)}
+#s-app-gomoku .a-gmk-his p{margin:0;font-size:15px;line-height:1.6;color:var(--m-fg);background:var(--m-soft);border-radius:var(--m-radius);padding:6px 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+#s-app-gomoku .a-gmk-inner{align-self:flex-start;display:flex;align-items:baseline;gap:6px;max-width:100%;padding:2px 0;font-size:13px;line-height:1.5;color:var(--m-muted);text-align:left}
+#s-app-gomoku .a-gmk-inner-k{flex:0 0 auto;font-size:11px;letter-spacing:.1em;padding:0 7px;border-radius:999px;border:1px dashed var(--m-line)}
+#s-app-gomoku .a-gmk-inner[aria-expanded="true"] .a-gmk-inner-k{border-style:solid}
+#s-app-gomoku .a-gmk-inner-t{font-style:italic;min-width:0;overflow-wrap:anywhere}
+#s-app-gomoku .a-gmk-inner-t:not(:empty)::before{content:"「"}
+#s-app-gomoku .a-gmk-inner-t:not(:empty)::after{content:"」"}
+#s-app-gomoku .a-gmk-acts{display:flex;justify-content:center;gap:10px;padding:0 14px 8px}
+#s-app-gomoku .a-gmk-acts [hidden]{display:none}

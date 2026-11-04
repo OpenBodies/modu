@@ -1,0 +1,633 @@
+/* Modu 小手机 layout: the app's own frame, positions and sizes. It holds no colours: every paint here
+   is a --m-* token, and a skin (skins/<id>.css) sets those tokens and adds its own look on top.
+   A skin is one complete file over this one; it never imports another skin. Contract: README.md. */
+
+/* A skin sets wallpapers with its own rules (.wp, .call), not inside tokens: browsers disagree on where
+   a url() inside a token resolves from. */
+/* Fallbacks for the newer tokens, so an older skin that does not set them still works. */
+:root{
+  --m-radius:16px; --m-bubble-radius:16px;
+  --m-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji";
+  --m-display:var(--m-body); --m-font:var(--m-body); --m-logo:var(--m-display);
+  --m-clock:var(--m-display);
+  --m-glass:var(--m-ta); --m-glass-fg:var(--m-ta-fg); --m-glass-line:transparent; --m-blur:0px;
+  --m-on-wall:var(--m-fg); --m-on-wall2:var(--m-fg2);
+  --m-accent:var(--m-me); --m-accent-fg:var(--m-me-fg);
+  --m-here:var(--m-accent); --m-asleep:var(--m-muted); --m-busy:var(--m-fg2);
+  --m-call-fg:var(--m-fg); --m-danger:var(--m-fg);
+  /* his mood's colour around his picture in a call with no VRM; a skin sets real colours */
+  --m-mood-joy:var(--m-accent); --m-mood-sadness:var(--m-asleep); --m-mood-anger:var(--m-danger);
+  --m-mood-surprise:var(--m-accent); --m-mood-relief:var(--m-here); --m-mood-neutral:var(--m-soft);
+  /* --m-page, the body of a page over the screen's wallpaper; unset, each page keeps its old
+     flat colour (var(--m-page, <old>) where it is used), so a skin that does not set it looks as before */
+}
+
+/* ---- page and phone ---- */
+html,body{height:100%;margin:0}
+/* a phone app never zooms and never scrolls sideways. A double tap does not zoom (two fingers still
+   can, for whoever needs it bigger); the page itself never scrolls, sideways or down, whatever a screen holds
+   (said on html as well as body: only the screens inside the phone scroll); and iPhone does not blow the text
+   up when the phone is turned. */
+html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow:hidden}
+body{background:var(--m-desk);color:var(--m-fg);font-family:var(--m-font);-webkit-font-smoothing:antialiased;display:flex;align-items:center;justify-content:center;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+/* every text box at 16px or more: iPhone zooms the whole page into a box whose text is smaller.
+   A box with its own size keeps it only at 16px or more. */
+input,textarea,select{font:inherit;font-size:max(16px,1em);color:inherit}
+.phone{position:relative;width:390px;height:844px;zoom:var(--fit,1);background:var(--m-bg);color:var(--m-fg);border-radius:46px;border:9px solid var(--m-frame);box-shadow:0 24px 60px var(--m-shade);overflow:hidden;font-size:15px;line-height:1.5;isolation:isolate}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:104px;height:28px;background:var(--m-frame);border-radius:999px;z-index:30;cursor:pointer}
+.status{position:absolute;top:0;left:0;right:0;height:46px;display:flex;justify-content:space-between;align-items:center;padding:4px 30px 0;font-size:13.5px;font-weight:600;color:var(--m-fg2);font-variant-numeric:tabular-nums;z-index:25;pointer-events:none;transition:color .2s}
+.phone[data-on-wall] .status{color:var(--m-on-wall)}
+.status .sig{display:flex;gap:5px;align-items:center}
+.status .ic{width:16px;height:16px}
+@media (max-width:500px){
+  body{display:block}
+  .phone{width:100%;height:100%;border:0;border-radius:0;box-shadow:none}
+  .island,.status{display:none}
+  .phone{--top:env(safe-area-inset-top,0px)}
+  /* with the phone's keyboard up, the phone is the part of the screen the keyboard leaves
+     (--vvh / --vvt from visualViewport, set by the page); without it they are unset */
+  .phone{position:fixed;left:0;right:0;top:var(--vvt,0px);height:var(--vvh,auto)}
+  /* with no keyboard up the phone is pinned to all four edges of the screen. Opened from the iPhone
+     home screen, iOS can give 100% (and the window's height) as the screen minus the status bar, so a phone sized
+     by height stops short and the page's flat colour shows as a solid bar under the dock; pinned edges run the wallpaper
+     to the bottom edge, as on a real phone. If iOS still leaves a strip, it is the wallpaper's own colour. */
+  .phone{bottom:0}
+  body{background:var(--m-wall)}
+}
+/* ?shot=1: the phone's own status bar, for screenshots taken at phone size */
+@media (max-width:500px){ :root[data-shot] .status{display:flex;padding:4px 26px 0} }
+
+[hidden]{display:none !important}
+.brand{display:none}
+.empty{white-space:pre-line}
+.phone *{scrollbar-width:none}
+.phone ::-webkit-scrollbar{display:none}
+
+/* the wallpaper: one layer behind the lock screen and the home screen */
+.wp{position:absolute;inset:0;background:var(--m-wall);background-size:cover;background-position:center;z-index:0}
+.wp-img{position:absolute;inset:0;background:center/cover no-repeat;transition:opacity .3s}
+:root[data-wall="room"] .wp-img{background-image:url("walls/room-day.webp")}
+:root[data-wall="room"][data-night="on"] .wp-img{background-image:url("walls/room-night.webp")}
+@media (prefers-color-scheme: dark){ :root[data-wall="room"][data-night="auto"] .wp-img{background-image:url("walls/room-night.webp")} }
+
+/* screens */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--m-bg);transition:transform .28s ease,opacity .28s ease;z-index:1}
+.screen:not(.on-wall):not(.call){background:var(--m-chat,var(--m-bg))}
+.screen.on-wall{background:transparent}
+.screen[hidden]{display:flex !important;visibility:hidden;opacity:0;transform:translateX(24px);pointer-events:none}
+.screen.on-wall[hidden]{transform:scale(1.03)}
+.phone:not(.ready) .screen{transition:none}
+.pad-top{height:46px;flex:0 0 auto}
+@media (max-width:500px){ .pad-top{height:max(10px,env(safe-area-inset-top,0px))} :root[data-shot] .pad-top{height:46px} }
+
+/* icons: thin lines in the skin's ink */
+.ic{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle;flex:0 0 auto}
+
+/* avatar: the whole picture */
+/* a tall card picture (most are 2:3) is cut toward its top, where the face is, not through the middle */
+.av{width:42px;height:42px;border-radius:50%;background:var(--m-soft) center 22%/cover no-repeat;flex:0 0 auto}
+.av.sm{width:34px;height:34px}
+.av.xs{width:22px;height:22px}
+
+/* glass: a surface over the wallpaper (frosted in 柔光, a solid block in Modu) */
+.glass{background:var(--m-glass);color:var(--m-glass-fg);-webkit-backdrop-filter:blur(var(--m-blur)) saturate(1.4);backdrop-filter:blur(var(--m-blur)) saturate(1.4);border:1px solid var(--m-glass-line)}
+
+/* top bar inside an app */
+.bar{display:flex;align-items:center;gap:10px;padding:8px 16px 11px;border-bottom:1px solid var(--m-line);min-height:30px;flex:0 0 auto;position:relative;z-index:2}
+.bar .back{color:var(--m-fg2);display:flex;margin-left:-6px}
+.bar .title{font-size:17px;font-family:var(--m-display);font-weight:600;color:var(--m-fg)}
+.bar .sp{margin-left:auto;display:flex;gap:16px;color:var(--m-fg2);align-items:center}
+.bar .sp button{display:flex}
+.bar .sp .on{color:var(--m-fg)}
+.bar .txt{font-size:14px;color:var(--m-fg2)}
+
+/* ---- 锁屏 ---- */
+.lk{flex:1;display:flex;flex-direction:column;align-items:center;padding:6px 20px 14px;color:var(--m-on-wall);cursor:pointer;touch-action:none;user-select:none}
+.presence{display:inline-flex;align-items:center;gap:8px;padding:5px 14px 5px 5px;border-radius:999px;font-size:13px;margin-top:4px}
+.presence .pname{font-weight:600}
+.presence .pdot{width:8px;height:8px;border-radius:50%;background:var(--m-here);box-shadow:0 0 0 3px color-mix(in srgb,var(--m-here) 25%,transparent)}
+.presence[data-state="asleep"] .pdot{background:var(--m-asleep);box-shadow:none}
+.presence[data-state="busy"] .pdot{background:var(--m-busy);animation:pulse 1.4s infinite}
+.presence[data-state="away"] .pdot{background:transparent;box-shadow:none;border:1.5px solid var(--m-muted);box-sizing:border-box}
+.presence .ic{width:15px;height:15px;margin-left:-2px}
+@keyframes pulse{50%{opacity:.35}}
+.lk-date{margin-top:26px;font-size:17px;font-weight:500;letter-spacing:.04em;color:var(--m-on-wall2)}
+.lk-time{font-family:var(--m-clock);font-size:96px;line-height:1;font-weight:300;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:2px}
+.lk-note{margin-top:auto;width:100%;box-sizing:border-box;display:flex;gap:11px;align-items:flex-start;padding:12px 14px;border-radius:calc(var(--m-radius) + 4px);text-align:left}
+.lk-note .lk-body{flex:1;min-width:0}
+.lk-note .lk-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.lk-note b{font-size:14.5px}
+.lk-note small{font-size:12px;opacity:.7;white-space:nowrap}
+.lk-note p{margin:2px 0 0;font-size:14px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lk-hint{margin-top:18px;font-size:13px;color:var(--m-on-wall2);letter-spacing:.08em;animation:hint 2.6s ease-in-out infinite}
+@keyframes hint{0%,100%{transform:translateY(0);opacity:.75}50%{transform:translateY(-4px);opacity:1}}
+.lk-bar{width:134px;height:5px;border-radius:3px;background:var(--m-on-wall);opacity:.75;margin-top:10px}
+/* 锁屏密码: the keypad that opens over the wallpaper; a wrong code shakes the dots */
+.lk-code{flex:1;display:flex;flex-direction:column;align-items:center;padding:34px 20px 18px;color:var(--m-on-wall);user-select:none;text-shadow:var(--m-label-shadow,none)}
+.lk-code[hidden]{display:none}
+.lk-ask{font-size:17px;font-weight:500;margin-top:24px;min-height:24px}
+.lk-dots{display:flex;gap:16px;margin:16px 0 30px}
+.lk-dots i{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--m-on-wall);box-sizing:border-box}
+.lk-dots i.on{background:var(--m-on-wall)}
+.lk-dots.shake{animation:lkshake .42s}
+@keyframes lkshake{15%,55%{transform:translateX(-11px)}35%,75%{transform:translateX(11px)}}
+.lk-keys{display:grid;grid-template-columns:repeat(3,74px);gap:16px 24px}
+.lk-keys button{width:74px;height:74px;border-radius:50%;font-size:28px;font-weight:300;font-variant-numeric:tabular-nums;background:var(--m-glass);color:var(--m-glass-fg);border:1px solid var(--m-glass-line);-webkit-backdrop-filter:blur(var(--m-blur));backdrop-filter:blur(var(--m-blur));text-shadow:none}
+.lk-keys button.k-del{background:transparent;border-color:transparent;color:var(--m-on-wall);font-size:15px}
+.lk-first{margin-top:auto;font-size:12.5px;color:var(--m-on-wall2);text-align:center}
+.lk-code .link{color:var(--m-on-wall2);margin-top:6px}
+/* 忘记密码 beside 取消 under the keypad; in its sheet, 恢复成 (the first code) fills from the left while it is held */
+.lk-links{display:flex;justify-content:center;gap:28px}
+.btn.hold{position:relative;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.btn.hold i{position:absolute;inset:0;background:currentColor;opacity:.25;transform:scaleX(0);transform-origin:left center;transition:transform .15s ease-out}
+.btn.hold.filling i{transform:scaleX(1);transition:transform 1.5s linear}
+.btn.hold span{position:relative}
+
+/* ---- 桌面 ---- */
+.wall{flex:1;min-height:0;padding:4px 0 12px;display:flex;flex-direction:column;gap:10px;overflow:hidden;color:var(--m-on-wall)}
+.wall.photo{background-size:cover}
+.pages{flex:1;min-height:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;overscroll-behavior-x:contain}
+.page{flex:0 0 100%;box-sizing:border-box;scroll-snap-align:start;padding:2px 18px 0;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.wrow{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.w{background:var(--m-ta);color:var(--m-ta-fg);border-radius:calc(var(--m-radius) + 6px);padding:13px 14px;min-width:0;text-align:left;box-sizing:border-box;position:relative;overflow:hidden}
+.wrow .w{aspect-ratio:1/1;display:flex;flex-direction:column}
+/* mixed sizes: wide cards, a square beside four icons, a slim strip, like a phone's own home screen */
+.w.wide{width:100%;display:flex}
+.wmix{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
+.wmix .w{aspect-ratio:1/1;display:flex;flex-direction:column}
+.grid.g2{grid-template-columns:1fr 1fr;align-content:space-between;gap:10px 6px}
+.w small{font-size:12px}
+/* the clock: big, with a greeting */
+.w.big{grid-column:1/-1;display:flex;justify-content:space-between;align-items:flex-end;padding:6px 6px 2px}
+.w .greet{font-size:15px;font-weight:500;letter-spacing:.04em}
+.w .clock{font-family:var(--m-clock);font-size:64px;line-height:1.02;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.w .sub{font-size:13.5px;margin-top:4px;opacity:.85}
+.w .wx{display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-size:12.5px;padding-bottom:4px}
+.w .wx .ic{width:30px;height:30px}
+/* his widget */
+.w.him{gap:6px}
+.w.him.wide{gap:14px;align-items:center;padding:14px 16px;min-height:150px}
+.w.him.wide .av{width:62px;height:62px;flex:0 0 auto}
+.w.him .hbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.w.him .htop{display:flex;justify-content:space-between;align-items:baseline;gap:8px;width:100%}
+.w.him .av{width:44px;height:44px}
+.w.him .days{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--m-accent);color:var(--m-accent-fg);white-space:nowrap}
+.w.him b{display:block;font-size:16px;margin-top:0}
+.w.him small{display:block;font-size:13px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;opacity:.85}
+.w.him small.t{opacity:.6;-webkit-line-clamp:1;font-size:11px;flex:0 0 auto}
+.w.him .hbody .days{margin-top:3px}
+/* 日历 */
+.w.cal .wd{font-size:12.5px;font-weight:600;color:var(--m-accent)}
+.w.cal .dd{font-family:var(--m-clock);font-size:40px;line-height:1;margin:2px 0 8px}
+.w.cal .ev{display:flex;gap:7px;align-items:stretch;font-size:12.5px;line-height:1.3;margin-top:5px}
+.w.cal .ev:before{content:"";width:3px;border-radius:2px;background:var(--m-accent);flex:0 0 auto}
+.w.cal .ev small{display:block;opacity:.65;font-size:11px}
+.w.cal .ev b{font-weight:500;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w.cal .ev > span{min-width:0}
+.w.cal .empty{font-size:12.5px;opacity:.8;padding:0;text-align:left}
+.w.cal small{display:block}
+.w.cal .gap{margin-top:8px}
+.w.cal .wk{display:flex;justify-content:space-between;margin-top:auto;padding-top:6px;font-size:10.5px;font-variant-numeric:tabular-nums}
+.w.cal .wk i{font-style:normal;width:17px;height:17px;line-height:17px;text-align:center;border-radius:50%;opacity:.6}
+.w.cal .wk i.on{opacity:1;background:var(--m-accent);color:var(--m-accent-fg);font-weight:600}
+/* 清单 */
+.w.todo .wt{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:600;margin-bottom:4px}
+.w.todo .wt small{font-weight:400;opacity:.6}
+.w.todo .ti{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;width:100%;text-align:left}
+.w.todo .ti span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.w.todo .ck{width:16px;height:16px;border-radius:50%;border:1.5px solid currentColor;opacity:.55;flex:0 0 auto;box-sizing:border-box;position:relative}
+.w.todo .ti.done span{text-decoration:line-through;opacity:.5}
+.w.todo .ti.done .ck{background:var(--m-accent);border-color:var(--m-accent);opacity:1}
+.w.todo .ti.done .ck:after{content:"";position:absolute;left:4.5px;top:1.5px;width:4px;height:8px;border:solid var(--m-accent-fg);border-width:0 1.8px 1.8px 0;transform:rotate(45deg)}
+.w.todo.wide{flex-direction:column;min-height:118px;margin-top:10px}
+.w.todo .empty{font-size:12.5px;opacity:.65;padding:6px 0;text-align:left}
+/* 一起听 */
+.w.music{gap:8px}
+.w.music.wide{flex-direction:row;align-items:center;gap:12px;padding:10px 14px;max-height:96px}
+.w.music.wide .art{width:54px;height:54px}
+.w.music .mbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.w.music.wide .prog{margin-top:6px}
+.w.music.wide .tt{margin-top:0}
+.w.music.wide .ctl{gap:4px;flex:0 0 auto}
+.w.music.wide .mtop{flex-direction:column-reverse;align-items:flex-start;gap:1px}
+.w.music.wide .lbl{margin-left:0;font-size:10.5px;letter-spacing:.06em}
+.w.music.wide .mtop b{max-width:100%}
+.w.music.wide .ctl button{padding:4px}
+.w.music .mtop{display:flex;gap:10px;align-items:baseline;min-width:0}
+.w.music .mtop b{min-width:0}
+.w.music .art{width:54px;height:54px;border-radius:12px;flex:0 0 auto;background:var(--m-art);position:relative;overflow:hidden}
+.w.music .art:after{content:"";position:absolute;width:30px;height:30px;border-radius:50%;right:-8px;bottom:-8px;background:var(--m-art-disc);box-shadow:inset 0 0 0 9px var(--m-art-ring)}
+.w.music .lbl{font-size:11px;opacity:.6;margin-left:auto;flex:0 0 auto}
+.w.music b{display:block;font-size:13.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w.music small{display:block;opacity:.65;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w.music .prog{height:3px;border-radius:2px;background:var(--m-line);position:relative;margin-top:auto}
+.w.music .prog i{position:absolute;left:0;top:0;bottom:0;width:34%;border-radius:2px;background:currentColor}
+.w.music .tt{display:flex;justify-content:space-between;font-size:10px;opacity:.55;font-variant-numeric:tabular-nums;margin-top:-4px}
+.w.music .ctl{display:flex;justify-content:space-around;align-items:center}
+.w.music .ctl button{display:flex}
+.w.music .ctl .ic{width:20px;height:20px}
+.w.music .ctl .play .ic{width:26px;height:26px}
+/* apps */
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 6px}
+.page:first-child{justify-content:space-between}
+/* a short window scrolls the page instead of squashing the widgets */
+.page > *{flex-shrink:0}
+.page.p2 .grid{margin-top:8px;gap:22px 6px}
+.page.p2 .grid.soonrow{margin-top:22px}
+.page.p2 .grid.soonrow:empty{display:none}
+.app{text-align:center;font-size:12px;position:relative;color:var(--m-on-wall);display:block;text-shadow:var(--m-label-shadow,none)}
+.app i{display:flex;align-items:center;justify-content:center;width:58px;height:58px;margin:0 auto 5px;border-radius:16px;background:var(--m-ta);color:var(--m-ink);font-style:normal}
+.app i .ic{width:27px;height:27px}
+.app .badge{position:absolute;top:-5px;left:calc(50% + 17px);min-width:19px;height:19px;padding:0 5px;box-sizing:border-box;border-radius:10px;background:var(--m-danger);color:var(--m-accent-fg);font:600 11px/19px var(--m-font,inherit);text-align:center;text-shadow:none;pointer-events:none}
+.app.soon i{opacity:.8}
+.app .tag{position:absolute;top:-7px;right:2px;background:var(--m-me);color:var(--m-me-fg);font-size:9.5px;padding:0 6px;border-radius:999px;line-height:1.6;text-shadow:none}
+.app.soon .tag{background:var(--m-soft);color:var(--m-muted);border:1px solid var(--m-line)}
+.dots{display:flex;justify-content:center;gap:7px;flex:0 0 auto}
+.dots button{width:7px;height:7px;border-radius:50%;background:var(--m-on-wall);opacity:.35;transition:opacity .2s,width .2s}
+.dots button.on{opacity:.9}
+.dock{display:flex;justify-content:space-around;background:var(--m-dock);border-radius:30px;padding:10px 8px;margin:0 12px;color:var(--m-ink);flex:0 0 auto}
+.dock button{display:flex}
+.dock .app i{margin:0;width:56px;height:56px}
+.dock .ic{width:26px;height:26px}
+
+/* ---- 聊天 ---- */
+.bar .who{font-size:17px;font-family:var(--m-display);font-weight:600;color:var(--m-fg)}
+.bar .whobox{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.bar .whobox small{font-size:11.5px;color:var(--m-muted);font-weight:400}
+.chat{flex:1;padding:14px 14px 10px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;background:var(--m-chat,var(--m-soft));overscroll-behavior:contain}
+.chat > *,.mem > *,.list > *,.imp > *{flex-shrink:0}
+/* her own chat background (聊天设置), under a veil of the chat's colour so bubbles and times stay readable */
+:root{--m-chatbg-veil:rgba(246,243,238,.38)}
+:root[data-night="on"]{--m-chatbg-veil:rgba(30,30,32,.5)}
+@media (prefers-color-scheme: dark){ :root[data-night="auto"]{--m-chatbg-veil:rgba(30,30,32,.5)} }
+#s-chat.chatbg{background:linear-gradient(var(--m-chatbg-veil),var(--m-chatbg-veil)),var(--chatbg) center/cover no-repeat,var(--m-chat,var(--m-bg))}
+#s-chat.chatbg .chat{background:transparent}
+.sheet .opts.chatset .val{display:flex;align-items:center;gap:6px;color:var(--m-muted);min-width:0}
+.sheet .opts.chatset .val > span:not(.av){max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.b{max-width:76%;padding:9px 13px;border-radius:var(--m-bubble-radius);background:var(--m-ta);color:var(--m-ta-fg);white-space:pre-wrap;word-break:break-word;font-size:15px;line-height:1.5}
+.b.me{align-self:flex-end;background:var(--m-me);color:var(--m-me-fg);border-bottom-right-radius:4px}
+.b.ta{align-self:flex-start;border-bottom-left-radius:4px}
+.b + .b.ta,.b.ta + .b.ta{margin-top:-1px}
+.b.me + .b.ta,.b.ta + .b.me,.sticker + .b,.stamp + .b{margin-top:6px}
+.b.pop,.kao.pop{animation:pop .22s ease-out both}
+@keyframes pop{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
+.b .act{color:var(--m-muted);font-style:italic}
+.b.me .act{color:inherit;opacity:.7}
+.actline{align-self:flex-start;max-width:86%;font-size:13px;line-height:1.5;color:var(--m-muted);font-style:italic;padding:2px 6px;text-shadow:var(--m-label-shadow,none)}
+.b + .actline,.actline + .b,.actline + .actline{margin-top:4px}
+.stamp{align-self:center;font-size:11.5px;color:var(--m-muted);padding:6px 0 2px}
+.sticker{align-self:flex-start;width:74px;height:74px;border-radius:18px;background:var(--m-ta);display:flex;align-items:center;justify-content:center;color:var(--m-ink);margin-top:2px}
+.sticker .ic{width:40px;height:40px;stroke-width:1.4}
+.sticker .emoji{font-size:40px;line-height:1}
+/* his mood as a phone emoji is a small bubble of its own with the emoji at text size, as in a message; only a
+   drawn sticker keeps the big tile */
+.sticker.emo{width:auto;height:auto;padding:9px 13px;border-radius:var(--m-bubble-radius);border-bottom-left-radius:4px}
+.sticker.emo .emoji{font-size:15px;line-height:1.5}
+.moodchip .emoji{font-size:15px;line-height:1}
+/* 颜文字 under his bubbles (美化 → 表情; kaomoji.js) */
+.kao{align-self:flex-start;max-width:78%;padding:2px 6px;margin-top:2px;font-size:16px;line-height:1.4;color:var(--m-fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inner{align-self:flex-start;max-width:78%;display:flex;align-items:baseline;gap:6px;padding:2px 6px;margin-top:2px;font-size:12.5px;line-height:1.5;color:var(--m-muted);text-align:left;cursor:pointer}
+.inner .inner-k{flex:0 0 auto;font-size:11px;letter-spacing:.1em;padding:0 7px;border-radius:999px;border:1px dashed var(--m-line)}
+.inner[aria-expanded="true"] .inner-k{border-style:solid}
+.inner .inner-t{font-style:italic;min-width:0}
+.inner .inner-t:not(:empty)::before{content:"「"}
+.inner .inner-t:not(:empty)::after{content:"」"}
+.sticker + .kao,.kao + .b{margin-top:6px}
+.typing{align-self:flex-start;background:var(--m-ta);color:var(--m-muted);border-radius:var(--m-bubble-radius);padding:9px 14px;letter-spacing:3px;margin-top:6px}
+.typing span{animation:blink 1.2s infinite both}.typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+/* chat cards: a 红包, a transfer, an order, drawn by the page from an app's card() */
+.appcard{display:flex;flex-wrap:wrap;align-items:center;gap:10px;width:64%;max-width:250px;padding:12px 14px 8px;border-radius:var(--m-radius);background:var(--m-accent);color:var(--m-accent-fg);text-align:left;box-sizing:border-box;box-shadow:0 2px 10px var(--m-shade);margin-top:4px}
+.appcard.me{align-self:flex-end}.appcard.ta{align-self:flex-start}
+.appcard i{display:flex;width:38px;height:38px;border-radius:12px;align-items:center;justify-content:center;background:color-mix(in srgb,var(--m-accent-fg) 18%,transparent);flex:0 0 auto}
+.appcard i .ic{width:24px;height:24px}
+.appcard .ac-m{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.appcard .ac-t{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.appcard .ac-s{font-size:12.5px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.appcard .ac-f{flex:0 0 100%;font-size:11px;opacity:.8;border-top:1px solid color-mix(in srgb,var(--m-accent-fg) 28%,transparent);padding-top:6px}
+.appcard .ac-f:empty{display:none}
+.appcard.done{opacity:.72}
+.appcard.pop{animation:pop .22s ease-out both}
+.sysline{align-self:center;font-size:12.5px;color:var(--m-muted);text-align:center;max-width:86%}
+.sysline.unsent{align-self:flex-end;text-align:right;color:var(--m-danger);margin-top:-4px}
+/* a neutral chat card: a line, not her bubble and not his (an app session's summary; his invite) */
+.sysline.cardline{padding:3px 12px;border-radius:999px;background:color-mix(in srgb,var(--m-soft) 70%,transparent);font-size:12px;line-height:1.5}
+.sysline.cardline.pop{animation:pop .22s ease-out both}
+.sysline.cardline.tap{cursor:pointer}
+.sysline.cardline.tap::after{content:" ›";color:var(--m-muted)}
+/* a contact-scoped app's header: his face and 和 <name>; a tap switches person */
+.bar .withchip{margin-left:auto;display:flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border-radius:999px;background:var(--m-soft);color:var(--m-fg2);font-size:13px;max-width:52%;min-width:0}
+.bar .withchip .wn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet .contactpick .pk{display:flex;align-items:center;gap:10px}
+.inp{display:flex;gap:12px;align-items:flex-end;padding:9px 14px 18px;background:var(--m-bg);color:var(--m-fg2);flex:0 0 auto}
+.inp input,.inp textarea{flex:1;min-width:0;background:var(--m-soft);border:0;border-radius:999px;height:38px;padding:0 14px;outline:none;color:var(--m-fg)}
+/* the type box grows to about five lines (the page sets its height), then scrolls inside, with a
+   thin, quiet scrollbar only while there is more to see; its buttons sit at its foot */
+.inp textarea{display:block;box-sizing:border-box;resize:none;font-size:16px;line-height:22px;padding:7px 14px;border-radius:19px;overflow-y:hidden;overscroll-behavior:contain;word-break:break-word;max-height:calc(22px * 5 + 16px)}
+.phone .inp textarea.full{overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--m-muted) transparent}
+.phone .inp textarea.full::-webkit-scrollbar{display:block;width:4px}
+.phone .inp textarea.full::-webkit-scrollbar-thumb{background:var(--m-muted);border-radius:4px}
+.inp button{display:flex;flex:0 0 auto;min-height:38px;align-items:center}
+.inp .send{background:var(--m-me);color:var(--m-me-fg);border-radius:999px;padding:6px 14px;font-size:14px}
+.inp .send{min-height:0;margin-bottom:4px}
+
+/* ---- 聊天 list ---- */
+.clist{flex:1;overflow-y:auto;background:var(--m-page,var(--m-bg))}
+.citem{display:flex;gap:12px;align-items:center;width:100%;padding:12px 16px;border-bottom:1px solid var(--m-line);text-align:left;box-sizing:border-box}
+.citem .av{width:48px;height:48px}
+.citem .cmid{flex:1;min-width:0}
+.citem b{display:block;font-size:16px;font-weight:500;color:var(--m-fg)}
+.citem .cmid small{display:block;font-size:13px;color:var(--m-fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.citem .t{font-size:11.5px;color:var(--m-muted);align-self:flex-start;margin-top:4px}
+/* 添加联系人: the first row of the list, a plus where his picture would be */
+.citem.add .av{display:flex;align-items:center;justify-content:center;background:var(--m-soft);color:var(--m-fg2)}
+.citem.add .av .ic{width:22px;height:22px}
+.citem.add b{color:var(--m-fg2)}
+.imp-back{align-self:flex-start;margin:4px 0 -10px -6px;color:var(--m-fg2)}
+
+/* ---- 搬家 ---- */
+.imp{flex:1;padding:12px 24px 28px;display:flex;flex-direction:column;gap:14px;background:var(--m-page,var(--m-wall));background-size:cover;background-position:center;overflow:auto}
+.imp h1{font-family:var(--m-display);font-weight:600;font-size:30px;margin:28px 0 0;letter-spacing:.04em;color:var(--m-fg)}
+.imp .lead{font-size:14.5px;color:var(--m-fg2);margin:0 0 4px;line-height:1.65}
+.drop{border:1.5px dashed var(--m-fg2);border-radius:var(--m-radius);padding:22px 14px;text-align:center;background:var(--m-ta);color:var(--m-ta-fg);font-size:15px;line-height:1.6;cursor:pointer;transition:background .15s}
+.drop.over{background:var(--m-soft)}
+.drop .ic{width:34px;height:34px;margin-bottom:4px;color:var(--m-ink)}
+.drop small{display:block;color:var(--m-muted);font-size:13px}
+.drop.got small{color:var(--m-fg2)}
+.src{display:flex;gap:8px;flex-wrap:wrap}
+.src span{font-size:12.5px;padding:4px 11px;border-radius:999px;background:var(--m-ta);color:var(--m-fg2);border:1px solid var(--m-line)}
+.src span.dim{opacity:.45}
+.src span[role=button]{cursor:pointer}
+.src span[aria-pressed="true"]{color:var(--m-fg);border-color:var(--m-accent)}
+.note{font-size:13px;color:var(--m-muted);text-align:center}
+.note.err{color:var(--m-fg)}
+.contact{background:var(--m-ta);color:var(--m-ta-fg);border-radius:var(--m-radius);padding:14px;display:flex;gap:12px;align-items:center}
+.contact .av{width:50px;height:50px}
+.contact b{display:block;font-size:17px;font-family:var(--m-display);color:var(--m-fg)}
+.contact small{font-size:13px;color:var(--m-fg2);display:block;white-space:pre-line;line-height:1.5}
+/* 搬家: the c.ai app's export: which chat, who he is, his picture */
+.caipick{display:flex;flex-direction:column;gap:8px}
+.caipick .gtitle{margin:4px 0 0;padding:0 2px}
+.picks{display:flex;flex-direction:column;gap:8px}
+.picks.row{flex-direction:row;flex-wrap:wrap}
+.pick{background:var(--m-ta);color:var(--m-ta-fg);border:1.5px solid var(--m-line);border-radius:var(--m-radius);padding:10px 12px;text-align:left;min-height:44px;box-sizing:border-box;width:100%}
+.pick b{display:block;font-weight:400;font-size:14px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pick small{display:block;font-size:12px;color:var(--m-muted);margin-top:2px}
+.picks.row .pick{width:auto;border-radius:999px;padding:8px 14px;font-size:14px}
+.pick.on{border-color:var(--m-accent);box-shadow:0 0 0 1px var(--m-accent)}
+.pthumb{width:52px;height:52px;border-radius:50%;background-size:cover;background-position:center;border:2px solid var(--m-line);background-color:var(--m-soft)}
+.pthumb.on{border-color:var(--m-accent)}
+.cainame{width:100%;box-sizing:border-box;font-size:16px;padding:10px 12px;border-radius:12px;border:1px solid var(--m-line);background:var(--m-ta);color:var(--m-ta-fg);outline:none}
+.spacer{flex:1}
+.btn{display:block;width:100%;background:var(--m-me);color:var(--m-me-fg);border-radius:999px;padding:13px;text-align:center;font-size:16px;letter-spacing:.08em}
+.btn[disabled]{opacity:.4;cursor:default}
+.link{display:block;text-align:center;font-size:13.5px;color:var(--m-fg2);padding:4px}
+
+/* ---- 记忆 ---- */
+.mem{flex:1;padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:var(--m-page,var(--m-soft));overflow-y:auto}
+.mcard{background:var(--m-ta);color:var(--m-ta-fg);border-radius:var(--m-radius);padding:11px 14px;font-size:14.5px;line-height:1.6;text-align:left;width:100%;box-sizing:border-box;display:block}
+.mcard small{display:block;color:var(--m-muted);font-size:11.5px;margin-top:4px}
+.mcard.sum{background:var(--m-me);color:var(--m-me-fg)}.mcard.sum small{color:inherit;opacity:.7}
+.mcard textarea{width:100%;box-sizing:border-box;border:0;background:transparent;resize:none;outline:none;line-height:1.6;min-height:70px;padding:0}
+.mcard .row{display:flex;gap:16px;justify-content:flex-end;font-size:13.5px;margin-top:6px}
+.mcard .row .del{margin-right:auto;opacity:.75}
+.mcard .row .pin{opacity:.75}
+/* 记忆: whose words, search and sort, groups that open on a tap */
+.mcard .who{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.who button{font-size:13px;padding:6px 12px;min-height:34px;border-radius:999px;border:1px solid var(--m-line);color:var(--m-fg2);background:transparent}
+.who button.on{background:var(--m-accent);color:var(--m-accent-fg);border-color:transparent}
+.mtools{display:flex;gap:8px;align-items:center;padding:8px 14px 4px;background:var(--m-soft);flex-shrink:0}
+.msearch{flex:1;min-width:0;font-size:16px;padding:8px 12px;border-radius:999px;border:1px solid var(--m-line);background:var(--m-ta);color:var(--m-ta-fg);outline:none;box-sizing:border-box;-webkit-appearance:none;appearance:none}
+.msort{display:flex;flex-shrink:0;border:1px solid var(--m-line);border-radius:999px;overflow:hidden}
+.msort button{font-size:12.5px;padding:8px 10px;min-height:36px;color:var(--m-fg2);background:var(--m-ta)}
+.msort button.on{background:var(--m-accent);color:var(--m-accent-fg)}
+.mgroup{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:6px 4px;font-size:13.5px;color:var(--m-fg2);text-align:left;box-sizing:border-box}
+.mgroup small{margin-left:auto;font-size:12px;color:var(--m-muted)}
+.mgroup:after{content:"›";font-size:18px;line-height:1;color:var(--m-muted);transition:transform .15s}
+.mgroup.on:after{transform:rotate(90deg)}
+.hint{text-align:center;font-size:12.5px;color:var(--m-muted);padding:8px 0 4px}
+.empty{text-align:center;font-size:14px;color:var(--m-muted);padding:40px 20px;line-height:1.8}
+
+/* ---- 身体: 虚拟形象 + 关联设备 ---- */
+.tabs{display:flex;gap:6px;margin:12px 16px 0;padding:4px;border-radius:999px;background:var(--m-soft);flex:0 0 auto}
+.tabs button{flex:1;padding:7px 0;border-radius:999px;font-size:14px;color:var(--m-fg2)}
+.tabs button.on{background:var(--m-ta);color:var(--m-fg);font-weight:600}
+.tabbody{flex:1;overflow-y:auto;padding:14px 16px 20px;display:flex;flex-direction:column;gap:12px}
+.tabbody > *{flex-shrink:0}
+.teaser{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;border-radius:calc(var(--m-radius) + 6px);overflow:hidden;background:var(--m-call-bg,var(--m-wall));background-size:cover;background-position:center;padding:18px 16px 16px}
+.teaser .frame{position:relative;width:100%}
+.teaser .face{width:200px;height:240px;margin:0 auto;border-radius:22px;background:var(--m-soft) center/cover no-repeat;position:relative}
+.teaser .face.blur{filter:blur(3px) saturate(.9)}
+.teaser .face.live{background-image:none !important;background-color:transparent;width:100%;height:300px;-webkit-mask-image:linear-gradient(#000 78%,transparent);mask-image:linear-gradient(#000 78%,transparent)}
+.teaser .face canvas{display:block;width:100% !important;height:100% !important}
+.teaser .lock{position:absolute;top:43%;left:50%;transform:translate(-50%,-50%);width:62px;height:62px;border-radius:50%;background:var(--m-ta);display:flex;align-items:center;justify-content:center;color:var(--m-ink)}
+.teaser .lock .ic{width:28px;height:28px}
+.teaser h2{font-family:var(--m-display);font-weight:600;font-size:20px;margin:12px 0 2px;color:var(--m-call-fg)}
+.teaser p{font-size:13.5px;color:var(--m-call-fg);opacity:.8;margin:0 0 12px;line-height:1.6}
+.teaser .btn{width:72%}
+.teaser .moodchip{position:absolute;top:12px;right:12px}
+/* the 开发中 page (for parts not finished yet, e.g. 形象, 视频通话, 游戏, 信箱): one quiet card in the middle of the screen */
+.soonpage{display:flex;flex-direction:column;align-items:center;text-align:center;margin:auto 16px;transform:translateY(-6%);padding:36px 24px 32px;border-radius:calc(var(--m-radius) + 6px);background:var(--m-ta);color:var(--m-ta-fg);box-shadow:0 1px 3px var(--m-shade)}
+.soonmark{width:84px;height:84px;border-radius:26px;background:var(--m-soft);border:1px solid var(--m-line);display:flex;align-items:center;justify-content:center;color:var(--m-ink)}
+.soonmark .ic{width:38px;height:38px}
+.soontag{margin-top:16px;font-size:12px;padding:2px 10px;border-radius:999px;background:var(--m-soft);color:var(--m-muted);border:1px solid var(--m-line);letter-spacing:.06em}
+.soonpage h2{font-family:var(--m-display);font-weight:600;font-size:19px;margin:14px 0 6px;color:var(--m-fg)}
+.soonpage p{font-size:14px;line-height:1.75;color:var(--m-fg2);margin:0;max-width:280px}
+.soonpage .btn{width:72%;margin-top:24px}
+.soonpage p.soonkept{margin-top:12px;font-size:13px;color:var(--m-muted)}
+.dev{display:flex;gap:12px;align-items:center;padding:14px;border-radius:var(--m-radius);background:var(--m-ta);color:var(--m-ta-fg)}
+.dev .pic{width:58px;height:58px;border-radius:14px;background:var(--m-soft);display:flex;align-items:center;justify-content:center;color:var(--m-ink);flex:0 0 auto}
+.dev .pic .ic{width:34px;height:34px;stroke-width:1.3}
+.dev .dmid{flex:1;min-width:0}
+.dev b{display:block;font-size:15.5px}
+.dev small{display:block;font-size:12.5px;color:var(--m-fg2);line-height:1.45}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:2px 9px;border-radius:999px;background:var(--m-soft);color:var(--m-fg2);white-space:nowrap;border:1px solid var(--m-line)}
+.chip:before{content:"";width:6px;height:6px;border-radius:50%;background:var(--m-asleep)}
+.chip.ok{background:var(--m-accent);color:var(--m-accent-fg);border-color:transparent}
+.chip.ok:before{background:var(--m-accent-fg)}
+.chip.soon:before{display:none}
+.moodchip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 10px 3px 6px;border-radius:999px}
+.moodchip .ic{width:18px;height:18px}
+
+/* ---- 视频通话 ---- */
+.call{background:var(--m-call-bg,var(--m-wall));background-size:cover;background-position:center;color:var(--m-call-fg);overflow:hidden}
+.call .vrm{position:absolute;inset:0;z-index:0;-webkit-mask-image:linear-gradient(#000 62%,transparent 88%);mask-image:linear-gradient(#000 62%,transparent 88%)}
+.call .vrm canvas{display:block;width:100% !important;height:100% !important}
+.call .noface{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:0}
+.call .noface{--mood:var(--m-mood-neutral)}
+.call .noface[data-mood="joy"]{--mood:var(--m-mood-joy)}
+.call .noface[data-mood="sadness"]{--mood:var(--m-mood-sadness)}
+.call .noface[data-mood="anger"]{--mood:var(--m-mood-anger)}
+.call .noface[data-mood="surprise"]{--mood:var(--m-mood-surprise)}
+.call .noface[data-mood="relief"]{--mood:var(--m-mood-relief)}
+/* his picture, alive: a slow breath, a soft glow in his mood's colour, a quicker pulse while he speaks,
+   a slower, dimmer breath while he thinks */
+.call .noface .av{width:150px;height:150px;border-radius:50%;animation:breathe 4.6s ease-in-out infinite,glow 4.6s ease-in-out infinite;
+  box-shadow:0 0 0 5px color-mix(in srgb,var(--mood) 45%,transparent),0 0 46px 10px color-mix(in srgb,var(--mood) 40%,transparent);transition:box-shadow .9s ease}
+.call .noface[data-phase="thinking"] .av{animation:breathe 2.6s ease-in-out infinite,glow 2.6s ease-in-out infinite;filter:saturate(.85)}
+.call .noface.talk .av{animation:talk .32s ease-in-out infinite alternate,glow .9s ease-in-out infinite}
+.call .noface small{font-size:12.5px;opacity:.7}
+@keyframes breathe{50%{transform:scale(1.03)}}
+@keyframes talk{to{transform:scale(1.045)}}
+@keyframes glow{50%{box-shadow:0 0 0 8px color-mix(in srgb,var(--mood) 30%,transparent),0 0 64px 18px color-mix(in srgb,var(--mood) 55%,transparent)}}
+@media (prefers-reduced-motion:reduce){.call .noface .av{animation:none}}
+.call-top{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:6px}
+.call-top b{font-size:22px;font-family:var(--m-display);font-weight:600}
+.call-top small{font-size:13px;opacity:.8;font-variant-numeric:tabular-nums}
+.call-top .moodchip{margin-top:6px}
+.selfview{position:absolute;right:16px;top:62px;width:82px;height:116px;border-radius:14px;z-index:2;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;font-size:10.5px}
+.selfview .ic{width:22px;height:22px;opacity:.7}
+@media (max-width:500px){ .selfview{top:max(16px,env(safe-area-inset-top,0px))} :root[data-shot] .selfview{top:62px} }
+.caption{position:relative;z-index:2;margin:auto 18px 10px;padding:10px 14px;border-radius:16px;font-size:14.5px;line-height:1.5;text-align:center;min-height:0;transition:opacity .3s}
+.caption:empty{opacity:0}
+.call-say{position:relative;z-index:2;display:flex;gap:8px;margin:0 18px 14px;padding:5px 5px 5px 14px;border-radius:999px;align-items:center}
+.call-say input{flex:1;min-width:0;border:0;background:transparent;outline:none;height:34px;color:inherit}
+.call-say input::placeholder{color:inherit;opacity:.6}
+.call-say button{border-radius:999px;padding:6px 14px;font-size:14px;background:var(--m-accent);color:var(--m-accent-fg)}
+.call-ctl{position:relative;z-index:2;display:flex;justify-content:space-around;align-items:flex-start;padding:4px 30px 26px}
+.call-ctl button{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11.5px}
+.call-ctl button i{width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-style:normal}
+.call-ctl button.on i{background:var(--m-call-fg);color:var(--m-call-bg-solid,var(--m-bg))}
+.call-ctl .hang i{background:var(--m-danger);color:#fff}
+.call-ctl .hang .ic{transform:rotate(135deg)}
+.call-ctl .ic{width:26px;height:26px}
+.call .typing{position:relative;z-index:2;align-self:center;margin:auto 0 10px;background:var(--m-glass);color:var(--m-glass-fg)}
+
+/* ---- 美化 / 设置 / 声音: rows like the phone's own settings ---- */
+.list{flex:1;padding:12px 14px;display:flex;flex-direction:column;gap:12px;background:var(--m-page,var(--m-soft));overflow-y:auto}
+.group{background:var(--m-ta);color:var(--m-ta-fg);border-radius:var(--m-radius);padding:2px 14px}
+.gtitle{font-size:12.5px;color:var(--m-muted);padding:4px 4px 0;margin-bottom:-6px}
+.opt{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:15px;padding:12px 0;border-bottom:1px solid var(--m-line);width:100%;text-align:left;box-sizing:border-box;text-decoration:none;color:inherit}
+.opt:last-child{border-bottom:0}
+.opt > span:first-child{color:var(--m-fg);flex:0 0 auto}
+.opt .val{color:var(--m-muted);text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.opt .tag{font-size:10.5px;padding:0 6px;border-radius:999px;background:var(--m-soft);color:var(--m-muted);border:1px solid var(--m-line);margin-left:6px;vertical-align:2px}
+.opt input,.opt select{border:0;background:transparent;text-align:right;color:var(--m-fg2);outline:none;min-width:0;flex:1}
+.opt input::placeholder{color:var(--m-muted)}
+.opt.sub{font-size:13px;color:var(--m-muted);padding:8px 0}
+/* a row's title, then its description on a line of its own, smaller and muted (设置 → 他找你, 用量); a block that
+   holds several sections (#reachBlock, #presetBox: a div with no class of its own) keeps the list's spacing between them */
+.list > div:not([class]){display:flex;flex-direction:column;gap:12px}
+.list > div:not([class]) .opt > span > small{display:block;color:var(--m-muted);font-size:12.5px;line-height:1.5;margin-top:2px}
+.choice{display:flex;align-items:center;gap:10px}
+.choice .dot{box-sizing:border-box;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--m-muted);flex:0 0 auto}
+.choice.on .dot{border:5px solid var(--m-me)}
+.choice small{display:block;color:var(--m-muted);font-size:12.5px}
+.switch{width:46px;height:28px;border-radius:999px;background:var(--m-line);position:relative;flex:0 0 auto;transition:background .2s}
+.switch:after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--m-ta);box-shadow:0 1px 2px var(--m-shade);transition:left .2s}
+.switch.on{background:var(--m-me)}.switch.on:after{left:21px}
+.switch.off{opacity:.5}
+.foot{font-size:12.5px;color:var(--m-muted);padding:0 4px;line-height:1.6}
+/* 设置 → 模型 (and 小事用的模型): a row's small line under its title (服务: where to get a key); what
+   测试连接 / 拉取模型 found, kept under the row in plain words, with 复制原文; the model list in its sheet */
+#customRows .opt > span > small,[data-siderows] .opt > span > small{display:block;color:var(--m-muted);font-size:12.5px;line-height:1.5;margin-top:2px;white-space:normal}
+.opt.why{display:block;font-size:13.5px;line-height:1.55;color:var(--m-fg2);padding:10px 0}
+.opt:has(+ .opt.why[hidden]:last-child),.opt:has(+ .opt[hidden] + .opt[hidden]:last-child){border-bottom:0}
+.opt.why .raw{display:block;white-space:pre-wrap;margin-top:6px;font-size:11.5px;line-height:1.45;color:var(--m-muted);word-break:break-all;max-height:7.5em;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace}
+.opt.why .copy{display:block;margin-top:6px;font-size:13px;color:var(--m-accent);padding:4px 0}
+.sheet input[type=search]{width:100%;box-sizing:border-box;border:1px solid var(--m-line);background:var(--m-ta);color:var(--m-fg);border-radius:12px;padding:10px 12px;margin-bottom:8px;outline:none;font-size:16px}
+.sheet .mlist{max-height:50vh;overflow-y:auto;margin:0 0 8px}
+.sheet .mlist button > span{min-width:0;word-break:break-all}
+.sheet .mlist button small{display:block;color:var(--m-muted);font-size:12px;margin-top:2px}
+.sheet .mnote{font-size:12.5px;color:var(--m-muted);margin:0 0 10px;line-height:1.5}
+/* the looks, side by side */
+.looks{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.look{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:13.5px;color:var(--m-fg)}
+.look .shot{width:100%;aspect-ratio:9/16;border-radius:14px;background:var(--m-soft) center top/cover no-repeat;border:2px solid transparent;box-sizing:border-box}
+.look.on .shot{border-color:var(--m-accent)}
+.look.on span:after{content:" ✓";color:var(--m-accent)}
+
+/* ---- sheets, cards, toast ---- */
+.scrim{position:absolute;inset:0;background:var(--m-scrim);z-index:40;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.open{opacity:1;pointer-events:auto}
+.sheet{background:var(--m-bg);color:var(--m-fg);width:100%;border-radius:22px 22px 0 0;padding:20px 22px 30px;box-sizing:border-box;transform:translateY(30px);transition:transform .22s;max-height:86%;overflow-y:auto}
+.scrim.open .sheet{transform:none}
+.sheet h3{font-family:var(--m-display);font-weight:600;font-size:19px;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+.sheet h3 .ic{color:var(--m-ink)}
+.sheet h3 .tag{font-family:var(--m-body);font-weight:400;font-size:11px;background:var(--m-soft);color:var(--m-muted);border:1px solid var(--m-line);padding:1px 7px;border-radius:999px}
+.sheet p{font-size:14.5px;color:var(--m-fg2);margin:0 0 18px;line-height:1.65}
+.sheet .opts{display:flex;flex-direction:column;margin:0 0 14px}
+.sheet .opts button{padding:12px 0;border-bottom:1px solid var(--m-line);text-align:left;font-size:15px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheet .opts button.on:after{content:"✓";color:var(--m-fg2)}
+.sheet .opts .tag{font-size:10.5px;padding:0 6px;border-radius:999px;background:var(--m-soft);color:var(--m-muted);border:1px solid var(--m-line);margin-left:6px}
+.sheet .chatacts button > span{display:flex;align-items:center;gap:12px}
+.sheet .chatacts .ic{width:22px;height:22px;color:var(--m-fg2)}
+.sheet textarea,.sheet input[type=text],.sheet input[type=date]{width:100%;box-sizing:border-box;border:1px solid var(--m-line);background:var(--m-ta);color:var(--m-fg);border-radius:12px;padding:10px 12px;margin-bottom:12px;outline:none}
+.sheet .row2{display:flex;gap:8px}
+.sheet .row2 input[type=date]{flex:0 0 44%}
+.sheet .btn2{display:block;width:100%;text-align:center;padding:12px;color:var(--m-fg2);font-size:15px}
+.sheet .items{margin:0 0 14px;display:flex;flex-direction:column}
+.sheet .items > div{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--m-line);font-size:14.5px}
+.sheet .items > div span{flex:1;min-width:0}
+.sheet .items small{color:var(--m-muted);font-size:12px;display:block}
+.sheet .items .x{color:var(--m-muted);font-size:13px}
+.month{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:12.5px;margin:6px 0 14px}
+.month .h{color:var(--m-muted);font-size:11px;padding:2px 0}
+.month span{padding:5px 0;border-radius:999px;position:relative}
+.month .today{background:var(--m-accent);color:var(--m-accent-fg);font-weight:600}
+.month .has:after{content:"";position:absolute;left:50%;bottom:1px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--m-accent)}
+.month .today.has:after{background:var(--m-accent-fg)}
+.toast{position:absolute;left:50%;bottom:110px;transform:translateX(-50%);background:var(--m-strong,var(--m-fg));color:var(--m-strong-fg,var(--m-bg));font-size:13.5px;padding:8px 16px;border-radius:999px;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+
+/* 正在整理… at the top of 记忆 while the core works, with how far along it is */
+.mcard.mjob{display:flex;flex-direction:column;gap:6px;cursor:default}
+.mcard.mjob b{font-weight:600}
+.mcard.mjob small{margin:0}
+.mjob-bar{position:relative;height:4px;border-radius:999px;background:var(--m-line);overflow:hidden}
+.mjob-bar i{position:absolute;left:0;top:0;bottom:0;width:40%;border-radius:999px;background:var(--m-accent);animation:mjob-run 1.2s ease-in-out infinite}
+.mcard.mjob.parts .mjob-bar i{animation:none;transition:width .4s ease}
+@keyframes mjob-run{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
+
+/* the phone runs to the screen's bottom edge, so whatever sits at the bottom keeps clear of the
+   iPhone's home indicator (safe-area-inset-bottom; 0 on a phone without one, which keeps the plain padding).
+   Under .phone, so a skin's own padding (.clist{padding:…}) does not undo it. With the keyboard up (data-kbd, set
+   by the page) the indicator is under the keyboard, so the chat box and sheets sit right on top of it. */
+@media (max-width:500px){
+  .phone .inp{padding-bottom:max(18px,env(safe-area-inset-bottom,0px))}
+  .phone .wall{padding-bottom:max(12px,env(safe-area-inset-bottom,0px))}
+  .phone .sheet{padding-bottom:max(30px,calc(env(safe-area-inset-bottom,0px) + 14px))}
+  .phone .call-ctl{padding-bottom:max(26px,env(safe-area-inset-bottom,0px))}
+  .phone .list,.phone .mem{padding-bottom:max(12px,env(safe-area-inset-bottom,0px))}
+  .phone .tabbody{padding-bottom:max(20px,env(safe-area-inset-bottom,0px))}
+  .phone .imp{padding-bottom:max(28px,env(safe-area-inset-bottom,0px))}
+  .phone .clist{padding-bottom:max(12px,env(safe-area-inset-bottom,0px))}
+  :root[data-kbd] .phone .inp{padding-bottom:18px}
+  :root[data-kbd] .phone .sheet{padding-bottom:30px}
+}
+/* not made taller than the window on the iPhone home screen: on iOS 26 the window itself can stop short of the
+   bottom edge (iOS paints the strip below it), so a taller phone runs past the window and the chat box is cut off
+   under that strip. The phone is the window: the strip can show, but nothing of the page is hidden by it. */
+/* the strip itself. On iOS 26 a home-screen app with viewport-fit=cover and a black-translucent status bar
+   gets a window shorter than the screen by the status bar's height, as long as the document is no taller than that
+   short window (WebKit bug 301108). With html 100% tall, the document is always exactly as short, and the strip
+   stays. Here the document is made at
+   least the screen tall (100lvh, or the short window plus the status bar, whichever is less: no scroll once iOS gives
+   the whole screen), on the iPhone home screen only (iOS: -webkit-touch-callout; display-mode:standalone). Then iOS
+   gives the window the whole screen, and .phone, pinned to the window's four edges, reaches the bottom with it; with
+   the keyboard up, visualViewport is measured against the whole screen too. The phone itself is never made taller
+   than the window (see above). Others have tried this on iOS 26 simulators; a real iPhone is the test. */
+@supports (-webkit-touch-callout:none){
+  @media (display-mode:standalone) and (max-width:500px){ html{min-height:min(100lvh,calc(100% + env(safe-area-inset-top,0px)))} }
+}
+
+/* the frame fits any window (pinned to its four edges, no vh units, no fixed heights), but page 1
+   of the home screen is drawn for a 844 px phone: its widgets are fixed sizes that add up to 598 px, so on a window
+   shorter than about 730 px (an iPhone SE, a 640 px Android, any phone with the browser's bars showing) the page
+   would scroll (scrolling is preferred over squashing). Under 740 px the same widgets take their compact sizes: a smaller
+   clock, a tighter card for him, 50 px icons beside the calendar, a slimmer 一起听, 10 px gaps. Plain height media
+   queries, which every engine has, so UC, Huawei Browser and the iPhone home screen all get it; at 360x640 and
+   375x667 (360x600 too) page 1 fits with the dock; shorter still scrolls. Page 2 keeps its 4-column grid. */
+@media (max-width:500px) and (max-height:740px){
+  .page{gap:10px}
+  .w.big{padding:2px 6px 0}
+  .phone .w .clock{font-size:50px}  /* .phone: over a skin's own clock size (柔光 76px, Modu 46px) */
+  .w.him.wide{min-height:0;padding:11px 14px;gap:12px}
+  .w.him.wide .av{width:52px;height:52px}
+  .wmix .app i{width:50px;height:50px;margin-bottom:4px}
+  .wmix .app i .ic{width:24px;height:24px}
+  .w.music.wide{max-height:80px;padding:8px 14px}
+  .w.music.wide .art{width:44px;height:44px}
+  .w.music.wide .art:after{width:24px;height:24px;box-shadow:inset 0 0 0 7px var(--m-art-ring)}
+}

@@ -1,0 +1,4 @@
+# reach-woken v1
+# her message woke him (replies.asleep a number)
+# vars: (none)
+Her message woke you just now; you were asleep. Answer her briefly and naturally, still a little sleepy, the way you would from bed. Do not pretend you were up.

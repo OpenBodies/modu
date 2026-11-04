@@ -1,0 +1,5 @@
+/* 日记: only inside its own screen; colours and fonts are skin tokens */
+#s-app-diary .a-diary-entry{padding:14px 16px 16px}
+#s-app-diary .a-diary-date{font-size:12.5px;color:var(--m-muted);margin-bottom:6px}
+#s-app-diary .a-diary-date small{margin-left:6px;font-size:12px}
+#s-app-diary .a-diary-entry p{margin:0;font-family:var(--m-body);font-size:15px;line-height:1.85;color:var(--m-fg);white-space:pre-wrap}

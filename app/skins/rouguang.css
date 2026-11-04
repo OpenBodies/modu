@@ -1,0 +1,142 @@
+/* Modu 小手机 skin: Modu 柔光 (soft light), the default.
+   Frosted glass over Modu's own palette: warm oat, the logo's cube greys, sand and gold (#e2cfba /
+   #b7a08a). Its night is designed as the pair: Modu's charcoal (#262628) with one warm gold lamp.
+   Wallpapers are Modu's own (../walls/, made for this skin). They are set in plain rules below, not in
+   tokens: browsers disagree on where a url() inside a token resolves from. A skin is this one file over
+   ../layout.css: it sets the --m-* tokens and the look, never positions or sizes. */
+
+:root{
+  /* his mood's colour around his picture in a call with no VRM */
+  --m-mood-joy:#e8b76a; --m-mood-sadness:#8fa6c4; --m-mood-anger:#d88472; --m-mood-surprise:#e7cf7a; --m-mood-relief:#9cbf9a; --m-mood-neutral:#d9cbbb;
+  --m-bg:#f6f3ee; --m-fg:#3f3f42; --m-fg2:#67676a; --m-muted:#a29e98;
+  --m-me:#e2cfba; --m-me-fg:#3f3f42; --m-ta:rgba(255,255,255,.74); --m-ta-fg:#3f3f42;
+  --m-soft:#efebe4; --m-line:rgba(74,75,79,.10); --m-ink:#4a4b4f;
+  --m-wall:#efe9df; --m-chat:#f1ede6; --m-call-bg:#e9e2d7; --m-call-bg-solid:#e9e2d7; --m-call-fg:#3a3836;
+  --m-dock:rgba(255,255,255,.34); --m-shade:rgba(80,64,48,.12); --m-scrim:rgba(50,44,38,.26);
+  --m-desk:#e7e1d8; --m-frame:#2a2a2c;
+  --m-glass:rgba(255,255,255,.44); --m-glass-fg:#3f3f42; --m-glass-line:rgba(255,255,255,.62); --m-blur:24px;
+  --m-on-wall:#3a3a3d; --m-on-wall2:#5e5c59; --m-label-shadow:0 1px 6px rgba(255,255,255,.6);
+  --m-accent:#b7a08a; --m-accent-fg:#ffffff;
+  --m-gold:#b7a08a; --m-gold-lt:#e2cfba; --m-gold-md:#d1bca7; --m-gold-dk:#a0866f; --m-gold-wash:#f3ebe1;
+  --m-edge:#dcdbd8; --m-edge-dk:#c1c0be; --m-strong:#4a4b4f; --m-strong-fg:#f9f8f6;
+  --m-here:#b7a08a; --m-asleep:#a8a8a7; --m-busy:#d1bca7; --m-danger:#d4675b;
+  --m-art:linear-gradient(140deg,#f3ebe1 0%,#e2cfba 38%,#b7a08a 72%,#8f7a66 100%); --m-art-disc:#3d3c3e; --m-art-ring:#2c2b2d;
+  --m-radius:18px; --m-bubble-radius:19px;
+  --m-display:"Rubik","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --m-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
+  --m-clock:"Rubik","Noto Sans SC",sans-serif; --m-logo:"Rubik Mono One","Rubik",sans-serif;
+  --m-font:"Rubik","Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
+}
+:root[data-bubble="square"]{ --m-bubble-radius:7px; }
+:root[data-font="serif"]{ --m-font:"Noto Serif SC","Songti SC",serif; }
+/* 夜间: Modu's charcoal, one gold lamp left on */
+:root[data-night="on"]{
+  --m-bg:#262628; --m-fg:#eeebe5; --m-fg2:#c3bfb8; --m-muted:#8c8984;
+  --m-me:#c9ab86; --m-me-fg:#262628; --m-ta:rgba(58,56,58,.72); --m-ta-fg:#eeebe5;
+  --m-soft:#1e1e20; --m-line:rgba(238,235,229,.10); --m-ink:#e2cfba;
+  --m-wall:#262628; --m-chat:#232325; --m-call-bg:#262628; --m-call-bg-solid:#262628; --m-call-fg:#f3eee6;
+  --m-dock:rgba(40,40,43,.42); --m-shade:rgba(0,0,0,.35); --m-scrim:rgba(0,0,0,.5); --m-desk:#121213;
+  --m-glass:rgba(38,38,40,.42); --m-glass-fg:#f1ede6; --m-glass-line:rgba(255,236,206,.10);
+  --m-on-wall:#f4efe7; --m-on-wall2:#cbc3b6; --m-label-shadow:0 1px 6px rgba(0,0,0,.5);
+  --m-accent:#d9b98f; --m-accent-fg:#262628; --m-here:#e2b77a; --m-asleep:#77757a; --m-busy:#c9ab86;
+  --m-gold-wash:#3a332c; --m-strong:#e2cfba; --m-strong-fg:#262628; --m-edge:#141415; --m-edge-dk:#0e0e0f;
+  --m-art:linear-gradient(140deg,#5a4a3b 0%,#a0866f 45%,#e2b77a 100%); --m-art-disc:#161617; --m-art-ring:#0e0e0f;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: dark){
+  :root[data-night="auto"]{
+    --m-bg:#262628; --m-fg:#eeebe5; --m-fg2:#c3bfb8; --m-muted:#8c8984;
+    --m-me:#c9ab86; --m-me-fg:#262628; --m-ta:rgba(58,56,58,.72); --m-ta-fg:#eeebe5;
+    --m-soft:#1e1e20; --m-line:rgba(238,235,229,.10); --m-ink:#e2cfba;
+    --m-wall:#262628; --m-chat:#232325; --m-call-bg:#262628; --m-call-bg-solid:#262628; --m-call-fg:#f3eee6;
+    --m-dock:rgba(40,40,43,.42); --m-shade:rgba(0,0,0,.35); --m-scrim:rgba(0,0,0,.5); --m-desk:#121213;
+    --m-glass:rgba(38,38,40,.42); --m-glass-fg:#f1ede6; --m-glass-line:rgba(255,236,206,.10);
+    --m-on-wall:#f4efe7; --m-on-wall2:#cbc3b6; --m-label-shadow:0 1px 6px rgba(0,0,0,.5);
+    --m-accent:#d9b98f; --m-accent-fg:#262628; --m-here:#e2b77a; --m-asleep:#77757a; --m-busy:#c9ab86;
+    --m-gold-wash:#3a332c; --m-strong:#e2cfba; --m-strong-fg:#262628; --m-edge:#141415; --m-edge-dk:#0e0e0f;
+    --m-art:linear-gradient(140deg,#5a4a3b 0%,#a0866f 45%,#e2b77a 100%); --m-art-disc:#161617; --m-art-ring:#0e0e0f;
+    color-scheme:dark;
+  }
+}
+
+/* ---- frosted glass: soft, translucent, a thin light rim, no hard edges ---- */
+.w,.dock,.app i,.presence,.lk-note,.selfview,.caption,.call-say,.call-ctl button i,.tabs,.dev,.group,.mcard,.citem,.b.ta,.typing,.sticker,.contact,.drop,.teaser,.inp,.bar{
+  -webkit-backdrop-filter:blur(var(--m-blur)) saturate(1.4);backdrop-filter:blur(var(--m-blur)) saturate(1.4)}
+.w,.dock,.app i,.presence,.lk-note,.selfview,.caption,.call-say,.call-ctl button i{background:var(--m-glass);color:var(--m-glass-fg);border:1px solid var(--m-glass-line);box-shadow:0 8px 28px var(--m-shade)}
+.app i{color:var(--m-ink)}
+.w.big{background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;color:var(--m-on-wall)}
+.w .clock{font-weight:300;font-size:76px;letter-spacing:-.03em}
+.w .greet{color:var(--m-on-wall2)}
+.lk-time{font-weight:300}
+.dock{border-radius:32px}
+.dock .app i{background:transparent;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+.app .tag{background:var(--m-accent);color:var(--m-accent-fg)}
+.app.soon .tag{background:var(--m-glass);color:var(--m-glass-fg);border:1px solid var(--m-glass-line);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.app.soon i{opacity:1;color:var(--m-muted)}
+.call-ctl button.on i{background:var(--m-call-fg);color:var(--m-call-bg-solid)}
+.call-ctl .hang i{background:var(--m-danger);border-color:transparent}
+.call .typing{background:var(--m-glass);color:var(--m-glass-fg)}
+
+/* ---- wallpapers: day, and the night pair ---- */
+.wp{background:url("../walls/rouguang-day-1.webp") center/cover no-repeat,#efe9df}
+.screen:not(.on-wall):not(.call){background:linear-gradient(rgba(246,243,238,.62),rgba(246,243,238,.62)),url("../walls/rouguang-day-2.webp") center/cover no-repeat,#efe9df}
+.call,.teaser{background:url("../walls/call-day.webp") center/cover no-repeat,#e9e2d7}
+:root[data-night="on"] .wp{background:url("../walls/rouguang-night-1.webp") center/cover no-repeat,#262628}
+:root[data-night="on"] .screen:not(.on-wall):not(.call){background:linear-gradient(rgba(30,30,32,.6),rgba(30,30,32,.6)),url("../walls/rouguang-night-2.webp") center/cover no-repeat,#262628}
+:root[data-night="on"] .call,:root[data-night="on"] .teaser{background:url("../walls/call-night.webp") center/cover no-repeat,#262628}
+@media (prefers-color-scheme: dark){
+  :root[data-night="auto"] .wp{background:url("../walls/rouguang-night-1.webp") center/cover no-repeat,#262628}
+  :root[data-night="auto"] .screen:not(.on-wall):not(.call){background:linear-gradient(rgba(30,30,32,.6),rgba(30,30,32,.6)),url("../walls/rouguang-night-2.webp") center/cover no-repeat,#262628}
+  :root[data-night="auto"] .call,:root[data-night="auto"] .teaser{background:url("../walls/call-night.webp") center/cover no-repeat,#262628}
+}
+.chat,.mem,.list,.clist,.tabbody{background:transparent}
+.inp input,.inp textarea{background:var(--m-ta);border:1px solid var(--m-glass-line)}
+.group,.mcard,.dev,.contact{background:var(--m-ta);border:1px solid var(--m-glass-line);box-shadow:0 4px 18px var(--m-shade)}
+.citem{background:var(--m-ta);border:1px solid var(--m-glass-line);border-radius:var(--m-radius);margin:0 0 10px;box-shadow:0 4px 18px var(--m-shade)}
+.clist{padding:12px 14px}
+.citem.on{border-color:var(--m-accent)}
+.mcard.sum{background:color-mix(in srgb,var(--m-me) 70%,transparent);color:var(--m-me-fg)}
+.tabs{background:var(--m-ta);border:1px solid var(--m-glass-line)}
+.tabs button.on{background:var(--m-accent);color:var(--m-accent-fg)}
+.dev .pic{background:color-mix(in srgb,var(--m-me) 45%,transparent);color:var(--m-ink)}
+.teaser{border:1px solid var(--m-glass-line);box-shadow:0 8px 28px var(--m-shade)}
+.moodchip{background:var(--m-glass);color:var(--m-glass-fg);border:1px solid var(--m-glass-line);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+
+/* ---- chat ---- */
+.b.ta{border:1px solid var(--m-glass-line);box-shadow:0 2px 10px var(--m-shade)}
+.b.me{box-shadow:0 2px 10px var(--m-shade)}
+.sticker{background:var(--m-ta);border:1px solid var(--m-glass-line);color:var(--m-gold-dk)}
+.typing{background:var(--m-ta)}
+.btn,.inp .send{background:var(--m-strong);color:var(--m-strong-fg)}
+.switch.on,.choice.on .dot{border-color:var(--m-accent)}
+.switch.on{background:var(--m-accent)}
+
+/* ---- the head of every page: the strip under the clock and the bar are one pane of frosted
+   glass over the wallpaper, a light rim and a soft shadow under it, never Modu's flat band ---- */
+:root{ --m-page:transparent; }
+.screen > .pad-top:has(+ .bar),.bar{background:var(--m-glass);-webkit-backdrop-filter:blur(var(--m-blur)) saturate(1.5);backdrop-filter:blur(var(--m-blur)) saturate(1.5)}
+.screen > .pad-top:has(+ .bar){position:relative;z-index:2}
+.bar{border-bottom:1px solid var(--m-glass-line);box-shadow:0 10px 30px -14px var(--m-shade)}
+/* titles: a small round light where Modu has its gold square */
+.bar .title{position:relative}
+.bar .title::after{content:"";position:absolute;width:.28em;height:.28em;border-radius:1px;background:var(--m-gold);right:-.42em;top:.05em}
+/* the type box: the same glass at the foot of the page */
+.inp{background:var(--m-glass);border-top:1px solid var(--m-glass-line);box-shadow:0 -10px 30px -14px var(--m-shade)}
+
+/* ---- 搬家 ---- */
+.brand{display:block;margin-top:26px}
+.brand img{height:26px;width:auto;display:block}
+.imp h1{font-family:var(--m-display);font-weight:600}
+.drop{background:var(--m-ta);border-color:var(--m-gold);border-width:1.5px}
+.drop .ic{color:var(--m-gold-dk)}
+.src span{background:var(--m-ta)}
+.sheet{background:color-mix(in srgb,var(--m-bg) 97%,transparent);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
+.toast{background:var(--m-strong);color:var(--m-strong-fg)}
+
+/* 他的房间: a busy, warm picture, so text on it is light with a soft shadow */
+:root[data-wall="room"]{ --m-on-wall:#fff8ee; --m-on-wall2:#f6e8d6; --m-label-shadow:0 1px 8px rgba(30,20,10,.75); }
+:root[data-wall="room"] .wp-img::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(30,20,10,.38),rgba(30,20,10,.08) 32%,rgba(30,20,10,0) 55%,rgba(30,20,10,.3))}
+:root[data-wall="room"] .w.big,:root[data-wall="room"] .lk{text-shadow:0 1px 10px rgba(30,20,10,.55)}
+
+/* the 一起听 cover: a crop of his room at night */
+.w.music .art{background:url("../walls/room-night.webp") 46% 38%/360% no-repeat,#5a4a3b}

@@ -1,0 +1,59 @@
+/* 查手机: styles for its own screen only. Colours come from the skin's tokens. */
+#s-app-peek .opt.a-peek-item > span{display:flex;flex-direction:column;gap:2px;flex:1 1 auto;min-width:0;white-space:normal;line-height:1.5}
+#s-app-peek .opt.a-peek-item b{font-size:13px;color:var(--m-fg2);font-weight:600}
+#s-app-peek .a-peek-inner{font-size:12px;color:var(--m-accent)}
+/* while his phone unlocks something moves at once and keeps moving: the lock breathes, a light runs along a bar */
+#s-app-peek .a-peek-wait{display:flex;flex-direction:column;align-items:center;gap:14px;margin:56px auto 0;color:var(--m-fg2)}
+#s-app-peek .a-peek-wait b{font-weight:500;font-size:15px;color:var(--m-fg)}
+#s-app-peek .a-peek-lock{display:flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;background:var(--m-glass);border:1px solid var(--m-glass-line);color:var(--m-accent);animation:a-peek-breathe 1.2s ease-in-out infinite}
+#s-app-peek .a-peek-lock .ic{width:28px;height:28px}
+#s-app-peek .a-peek-run{position:relative;width:140px;height:4px;border-radius:999px;background:var(--m-line);overflow:hidden}
+#s-app-peek .a-peek-run i{position:absolute;top:0;bottom:0;left:0;width:40%;border-radius:999px;background:var(--m-accent);animation:a-peek-run 1.1s ease-in-out infinite}
+@keyframes a-peek-breathe{0%,100%{transform:scale(.92);box-shadow:0 0 0 0 color-mix(in srgb,var(--m-accent) 35%,transparent)}50%{transform:scale(1);box-shadow:0 0 0 10px transparent}}
+@keyframes a-peek-run{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
+/* his phone: his lock screen and home screen are drawn with the phone's own classes (.lk, .grid, .app, .citem, .chat, .b);
+   only what is his own is styled here. On her own wallpaper (the phone's .wp layer shows through), not his picture. */
+#s-app-peek.a-peek-bare{background:transparent}
+#s-app-peek .a-peek-onwall{border-bottom:0;background:transparent}
+#s-app-peek .a-peek-onwall .back,#s-app-peek .a-peek-onwall .title{color:var(--m-on-wall);text-shadow:var(--m-label-shadow,none)}
+#s-app-peek .a-peek-lk .lk-note{background:var(--m-glass);border:1px solid var(--m-glass-line);-webkit-backdrop-filter:blur(var(--m-blur));backdrop-filter:blur(var(--m-blur))}
+/* her picture on his lock screen: Modu keeps none of hers, so a soft placeholder with the first character of her name, never a black circle */
+#s-app-peek .a-peek-me{display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--m-accent) 28%,var(--m-glass));color:var(--m-glass-fg);border:1px solid var(--m-glass-line);font-size:14px;font-weight:600}
+/* his home screen is the phone's own home screen (.wall .pages .page .w .dock); a slimmer clock under his bar */
+#s-app-peek .a-peek-home{padding-top:0}
+#s-app-peek .a-peek-big .clock{font-size:54px}
+#s-app-peek .a-peek-big .greet{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62vw}
+#s-app-peek .a-peek-big .wx span{max-width:30vw;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#s-app-peek .a-peek-herw{min-height:118px}
+#s-app-peek .a-peek-herw .av.a-peek-me{font-size:24px}
+#s-app-peek .a-peek-day,#s-app-peek .a-peek-memo{cursor:pointer}
+#s-app-peek .a-peek-memo{min-height:0;margin-top:0}
+#s-app-peek .a-peek-memo .ti{cursor:inherit}
+#s-app-peek .a-peek-dot{width:6px;height:6px;border-radius:50%;background:var(--m-accent);flex:0 0 auto}
+#s-app-peek .a-peek-clist{display:flex;flex-direction:column;gap:8px}
+#s-app-peek .a-peek-clist .citem{border-radius:var(--m-radius)}
+#s-app-peek .a-peek-chatinner{align-self:flex-start;padding:2px 4px}
+#s-app-peek .a-peek-post,#s-app-peek .a-peek-entry,#s-app-peek .a-peek-letter{padding:12px 14px;line-height:1.6}
+#s-app-peek .a-peek-post > b{font-size:14px;color:var(--m-fg2);font-weight:600}
+#s-app-peek .a-peek-post p,#s-app-peek .a-peek-entry p,#s-app-peek .a-peek-letter p{margin:4px 0;white-space:pre-wrap;word-break:break-word}
+#s-app-peek .a-peek-when,#s-app-peek .a-peek-letter summary small{font-size:12px;color:var(--m-muted)}
+#s-app-peek .a-peek-likes,#s-app-peek .a-peek-c{font-size:13px;color:var(--m-fg2);margin-top:4px}
+#s-app-peek .a-peek-c b{font-weight:600}
+#s-app-peek .a-peek-date{font-size:13px;color:var(--m-muted)}
+#s-app-peek .a-peek-letter summary{display:flex;justify-content:space-between;align-items:baseline;gap:8px;cursor:pointer;list-style:none}
+#s-app-peek .a-peek-letter summary::-webkit-details-marker{display:none}
+#s-app-peek .a-peek-body .opt > span:first-child{flex:1 1 auto;min-width:0;white-space:normal;line-height:1.5}
+#s-app-peek .a-peek-body .opt > span:first-child small:not(.a-peek-inner){display:block;font-size:12px;color:var(--m-muted);margin-top:2px}
+#s-app-peek .a-peek-body .opt .val{flex:0 0 auto}
+@media (prefers-reduced-motion:reduce){ #s-app-peek .a-peek-lock{animation:none} #s-app-peek .a-peek-run i{animation-duration:2.4s} }
+/* his status under the clock and on his home screen; 联系人 */
+#s-app-peek .a-peek-status{margin-top:6px;font-size:14px}
+/* why 联系人 did not get written, where she looks */
+#s-app-peek .a-peek-failed b{color:var(--m-danger)}
+#s-app-peek .foot.a-peek-failed{color:var(--m-danger)}
+#s-app-peek .a-peek-person input{flex:0 0 auto;margin-right:10px}
+/* a note of his whose day has passed, crossed out */
+#s-app-peek .a-peek-done > span:first-child{text-decoration:line-through;color:var(--m-muted)}
+#s-app-peek .a-peek-day .empty,#s-app-peek .a-peek-memo .empty{color:inherit;opacity:.72}
+/* the day widget's heading readable on any wallpaper (the accent alone fades on a photo) */
+#s-app-peek .a-peek-day .wd{color:var(--m-glass-fg);opacity:.9}

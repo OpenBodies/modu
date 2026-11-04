@@ -1,0 +1,4 @@
+# reach-away-plans v1
+# what she told him she would do before she went quiet
+# vars: plans
+Before she went quiet she told you: {{plans}}. Your message picks that up, as of this moment: how it is going, whether she got there, something about it you thought of. In your own words, with a little of your own day if it fits; never ask what she already told you.

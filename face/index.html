@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modu 小手机 · 脸（VRM）</title>
+<style>
+  html, body { height:100%; margin:0; background:#f4efe8; overflow:hidden; font:14px/1.5 "Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif; color:#2a2622; }
+  canvas { display:block; }
+  #hud { position:fixed; left:12px; top:10px; background:rgba(255,255,255,.75); border-radius:8px; padding:6px 10px; white-space:pre-line; }
+  #hud b { color:#b24a3b; }
+  #pick { position:fixed; right:12px; top:10px; background:rgba(255,255,255,.75); border-radius:8px; padding:6px 10px; }
+  #bubble { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); max-width:80vw; background:rgba(255,255,255,.96); border:1px solid #e3ddd4; border-radius:14px; padding:8px 14px; opacity:0; transition:opacity .3s; box-shadow:0 2px 10px rgba(0,0,0,.08); }
+  #bubble.on { opacity:1; }
+</style>
+</head>
+<body>
+<div id="hud"><b id="name">脸</b>
+<span id="phase">idle</span> · <span id="emo">neutral</span>
+<span id="note">正在载入模型…</span></div>
+<div id="pick"><label>换一个 VRM：<input type="file" id="file" accept=".vrm"></label></div>
+<div id="bubble"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "../app/vendor/three@0.185.1/build/three.module.js",
+  "three/addons/": "../app/vendor/three@0.185.1/examples/jsm/",
+  "@pixiv/three-vrm": "../app/vendor/@pixiv/three-vrm@3.5.5/lib/three-vrm.module.js"
+},
+  "integrity": {
+  "../app/vendor/three@0.185.1/build/three.module.js": "sha384-Ecdwhw2t8c3nTR0hkEDZbwj+5rkKqzJ376RCQN2x1uofujOCuW/EvGg3BQzE7TS6",
+  "../app/vendor/three@0.185.1/build/three.core.js": "sha384-tfsIoyn3ACQbjob5Sw0zEGbcRscYZPCUEypq6YYs/TKQlq7Yg9jILDm/oZnfpq3D",
+  "../app/vendor/three@0.185.1/examples/jsm/loaders/GLTFLoader.js": "sha384-3CnKaFWE2emo2DOUQi/yFm4SMemUgSZ9IAJe/V2pyJTw9KXWYSmR0MiX/7RoPyiJ",
+  "../app/vendor/three@0.185.1/examples/jsm/utils/BufferGeometryUtils.js": "sha384-05mkYituMJObxUkTK7xbW9SA45DEaxOge7FQUGrhW3dsFz0fckzykM6RMAPN26rD",
+  "../app/vendor/three@0.185.1/examples/jsm/utils/SkeletonUtils.js": "sha384-Pozn8j5+YFr3ak8Pm90ayqDrGYn/DV7vVs/YIIqzJhzeJT0LQksoS1fZQ5lfsYlw",
+  "../app/vendor/@pixiv/three-vrm@3.5.5/lib/three-vrm.module.js": "sha384-Kf4hNsd+NwczRpFXB0RBdN6nMRyjoYpz/H9a3tWD9SH1423U+JgwLA9QSXvz7f4g"
+} }
+</script>
+<script type="module">
+// Modu 小手机 face: a VRM body on the provisional body seam (events from the phone).
+// It subscribes to BroadcastChannel "modu-body" and never calls a model itself.
+// Offline / no events: it keeps living in character (blink, breath, gaze). Model: ?model=<url>, a picked file, or ../samples/face.vrm.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+
+const $ = id => document.getElementById(id);
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true, preserveDrawingBuffer:true });   // preserve: lets a screenshot read the canvas
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+const camera = new THREE.PerspectiveCamera(30, innerWidth/innerHeight, 0.1, 20);
+const scene = new THREE.Scene();
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+const dir = new THREE.DirectionalLight(0xffffff, 1.1); dir.position.set(0.5, 1.5, 1.5); scene.add(dir);
+const lookTarget = new THREE.Object3D(); camera.add(lookTarget); scene.add(camera);
+addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+let vrm = null;
+const loader = new GLTFLoader(); loader.register(p => new VRMLoaderPlugin(p));
+function loadModel(url, label){
+  $('note').textContent = '正在载入模型…';
+  loader.load(url, gltf => {
+    if (vrm) { scene.remove(vrm.scene); VRMUtils.deepDispose(vrm.scene); }
+    vrm = gltf.userData.vrm;
+    VRMUtils.removeUnnecessaryJoints(gltf.scene);
+    scene.add(vrm.scene);
+    vrm.scene.rotation.y = (vrm.meta && vrm.meta.metaVersion === '1') ? 0 : Math.PI;
+    if (vrm.lookAt) vrm.lookAt.target = lookTarget;
+    const arm = { leftUpperArm:-1.25, rightUpperArm:1.25, leftLowerArm:-0.25, rightLowerArm:0.25 };
+    for (const [b, rz] of Object.entries(arm)) { const n = vrm.humanoid && vrm.humanoid.getNormalizedBoneNode(b); if (n) n.rotation.z = rz; }
+    const head = vrm.humanoid && vrm.humanoid.getNormalizedBoneNode('head');
+    if (head) { const p = head.getWorldPosition(new THREE.Vector3()); camera.position.set(p.x, p.y + 0.02, p.z + 0.7); camera.lookAt(p.x, p.y - 0.01, p.z); }
+    $('note').textContent = '模型：' + label + ' · 表情：' + Object.keys((vrm.expressionManager && vrm.expressionManager.expressionMap) || {}).join(' ');
+  }, undefined, e => { $('note').textContent = '模型载入失败：' + (e.message || e); });
+}
+const qs = new URLSearchParams(location.search);
+loadModel(qs.get('model') || '../samples/face.vrm', qs.get('model') || 'samples/face.vrm');
+$('file').onchange = e => { const f = e.target.files[0]; if (f) loadModel(URL.createObjectURL(f), f.name); };
+
+// --- body seam: subscribe --------------------------------------------------------------
+// 酒馆-style emotion labels → the VRM's six standard expressions.
+const EMO = { joy:'happy', amusement:'happy', love:'happy', excitement:'happy', gratitude:'happy', admiration:'happy', optimism:'happy',
+  sadness:'sad', grief:'sad', disappointment:'sad', remorse:'sad', anger:'angry', annoyance:'angry', disgust:'angry',
+  surprise:'surprised', fear:'surprised', confusion:'surprised', relief:'relaxed', caring:'relaxed', approval:'relaxed', neutral:'neutral' };
+const target = { happy:0, angry:0, sad:0, relaxed:0, surprised:0 };
+let phase = 'idle', talkUntil = 0, emoUntil = 0, glanceUntil = 0;
+function setEmotion(label){
+  const e = EMO[label] || 'neutral'; $('emo').textContent = label || 'neutral';
+  for (const k in target) target[k] = 0; if (e !== 'neutral') target[e] = 0.8;
+  emoUntil = performance.now()/1000 + 6;
+}
+function onEvent(m){
+  if (!m || !m.type) return;
+  // he is about to write to her first: a short look down at the phone
+  if (m.type === 'glance') glanceUntil = performance.now()/1000 + 1.6;
+  if (m.type === 'state'){ phase = m.phase || 'idle'; $('phase').textContent = phase; if (phase === 'thinking') { for (const k in target) target[k]=0; target.relaxed = 0.3; } }
+  if (m.type === 'turn'){
+    if (m.name) $('name').textContent = m.name;
+    if (m.speaker === 'companion'){
+      setEmotion(m.emotion);
+      $('bubble').textContent = m.text || ''; $('bubble').classList.add('on');
+      const spoken = speak(m.text || '');
+      if (!spoken){   // no voice available: length-based mouth timing
+        const secs = Math.min(12, 1.5 + (m.text || '').length * 0.12);
+        talkUntil = performance.now()/1000 + secs;
+        setTimeout(() => $('bubble').classList.remove('on'), secs * 1000 + 1500);
+      }
+    }
+  }
+}
+// --- voice: the browser's own speech synthesis (zero install; Windows and Edge ship Chinese voices).
+// Real mouth timing comes from the utterance's events. Swappable for a server TTS (Edge TTS, etc.) later:
+// a replacement only has to set talkUntil while audio plays. Browsers block audio until the user has
+// clicked once on the page, so the first turn may be silent; a click on the page unlocks it.
+// Silent by default. It reads aloud only with ?voice=on and the approved voice named in
+// ?vname= (Modu's 设置 link adds both only when his card has an approved voice and her voice switch is on); a device
+// without that voice stays silent: never the browser's default voice.
+const vname = qs.get('vname') || '';
+const voiceOn = qs.get('voice') === 'on' && !!vname && 'speechSynthesis' in window;
+let unlocked = false; addEventListener('pointerdown', () => { unlocked = true; }, { once:true });
+function pickVoice(){ return speechSynthesis.getVoices().find(v => v.name === vname) || null; }
+function speak(text){
+  if (!voiceOn) return false;
+  const clean = text.replace(/\*[^*]*\*/g, ' ').replace(/[“”"]/g, '').replace(/\s+/g, ' ').trim();   // skip *actions*
+  if (!clean) return false;
+  const lang = /[一-鿿]/.test(clean) ? 'zh' : 'en';
+  const u = new SpeechSynthesisUtterance(clean); u.lang = lang === 'zh' ? 'zh-CN' : 'en-US'; u.rate = 1.0;
+  const v = pickVoice(); if (!v) return false;   // not this device's: silent (timed mouth)
+  u.voice = v;
+  let started = false;
+  u.onstart = () => { started = true; talkUntil = Infinity; phase = 'speaking'; $('phase').textContent = phase; };
+  const done = () => { talkUntil = 0; setTimeout(() => $('bubble').classList.remove('on'), 1500); };
+  u.onend = done; u.onerror = done;
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+  // no voice started within 3 s (no voices installed, or audio still locked): fall back to timed mouth
+  setTimeout(() => { if (!started) { speechSynthesis.cancel(); const secs = Math.min(12, 1.5 + clean.length * 0.12); talkUntil = performance.now()/1000 + secs; setTimeout(done, secs * 1000); } }, 3000);
+  $('note').textContent = '声音：' + v.name + (unlocked ? '' : '（先点一下页面，浏览器才允许出声）');
+  return true;
+}
+if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => {};
+if ('BroadcastChannel' in window) new BroadcastChannel('modu-body').onmessage = e => onEvent(e.data);
+window.moduFace = { onEvent };   // for tests and for a bridge to inject events
+// ?demo=joy|sadness|anger|surprise|relief injects one sample turn after the model loads (for screenshots)
+if (qs.get('demo')) setTimeout(() => onEvent({ type:'turn', speaker:'companion', name:'Char', emotion: qs.get('demo'),
+  text: '*她笑了一下。* "被你看出来啦？下雨天在家喝茶，心情也跟着软软的。"' }), 2500);
+
+// --- idle life: blink, breath, gaze; expressions ease toward targets ------------------------
+const clock = new THREE.Clock(); let nextBlink = 2, blinkT = -1;
+function frame(){
+  requestAnimationFrame(frame);
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime, now = performance.now()/1000;
+  if (vrm){
+    const em = vrm.expressionManager;
+    if (em){
+      if (now > emoUntil) for (const k in target) target[k] = 0;
+      for (const k in target){ const cur = em.getValue(k) || 0; em.setValue(k, cur + (target[k] - cur) * Math.min(1, dt * 6)); }
+      nextBlink -= dt; if (nextBlink <= 0){ blinkT = 0; nextBlink = 2 + Math.random() * 4; }
+      if (blinkT >= 0){ blinkT += dt; em.setValue('blink', blinkT < 0.08 ? blinkT/0.08 : Math.max(0, 1 - (blinkT-0.08)/0.1)); if (blinkT > 0.2) blinkT = -1; }
+      const talking = now < talkUntil;
+      em.setValue('aa', talking ? 0.25 + 0.25 * Math.abs(Math.sin(t * 9)) : 0);
+      if (!talking && phase === 'speaking') { phase = 'idle'; $('phase').textContent = phase; }
+    }
+    const h = vrm.humanoid;
+    if (h){
+      const spine = h.getNormalizedBoneNode('spine'), head = h.getNormalizedBoneNode('head');
+      if (spine) spine.rotation.x = 0.015 * Math.sin(t * 1.2);
+      if (head) { head.rotation.y = 0.06 * Math.sin(t * 0.35); head.rotation.x = (phase === 'thinking' ? 0.08 : 0) + (performance.now()/1000 < glanceUntil ? 0.22 : 0) + 0.02 * Math.sin(t * 0.7); }
+    }
+    lookTarget.position.set(0.15 * Math.sin(t * 0.23), 0.05 * Math.sin(t * 0.31), 0);
+    vrm.update(dt);
+  }
+  renderer.render(scene, camera);
+}
+frame();
+</script>
+</body>
+</html>

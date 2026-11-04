@@ -1,0 +1,80 @@
+{
+  "format": "modu-regex/1",
+  "v": 2,
+  "name": "Modu default",
+  "note": "Modu's own default regex, SillyTavern regex-script shape. Display only (markdownOnly: true, placement 2 = his replies): they change what the screen shows, never the stored chat or the prompt. Markers ⟦face:x⟧ and ⟦sticker:x⟧ are drawn by the chat view.",
+  "scripts": [
+    {
+      "id": "modu-default-1",
+      "scriptName": "Hide state, promise and status tags",
+      "findRegex": "/(?<!\\s)\\s*[\\[【]\\s*(?:state|promise|status|next|no[ _-]?reply|不回|已读不回|承诺|状态)\\s*(?:[:：][^\\]】\\n]*)?[\\]】]/gi",
+      "replaceString": "",
+      "trimStrings": [],
+      "placement": [
+        2
+      ],
+      "disabled": false,
+      "markdownOnly": true,
+      "promptOnly": false,
+      "runOnEdit": true,
+      "substituteRegex": 0,
+      "minDepth": null,
+      "maxDepth": null,
+      "note": "Tags the app reads stay out of the bubbles."
+    },
+    {
+      "id": "modu-default-2",
+      "scriptName": "Mood tag to face",
+      "findRegex": "/(?<!\\s)\\s*[\\[【]\\s*(?:emotion|mood|情绪|心情)\\s*[:：]\\s*([A-Za-z一-鿿]{1,12})\\s*[\\]】]/gi",
+      "replaceString": "⟦face:$1⟧",
+      "trimStrings": [],
+      "placement": [
+        2
+      ],
+      "disabled": false,
+      "markdownOnly": true,
+      "promptOnly": false,
+      "runOnEdit": true,
+      "substituteRegex": 0,
+      "minDepth": null,
+      "maxDepth": null,
+      "note": "The mood tag becomes a face marker; the chat shows it as his mood sticker and the body's face."
+    },
+    {
+      "id": "modu-default-3",
+      "scriptName": "Sticker tag to sticker",
+      "findRegex": "/[\\[【]\\s*(?:sticker|表情包|表情)\\s*[:：]\\s*([\\w一-鿿-]{1,24})\\s*[\\]】]/gi",
+      "replaceString": "⟦sticker:$1⟧",
+      "trimStrings": [],
+      "placement": [
+        2
+      ],
+      "disabled": false,
+      "markdownOnly": true,
+      "promptOnly": false,
+      "runOnEdit": true,
+      "substituteRegex": 0,
+      "minDepth": null,
+      "maxDepth": null,
+      "note": "A sticker tag becomes a sticker marker, drawn as its own bubble. Only letters, digits, Chinese characters, _ and - pass, so no markup reaches the view."
+    },
+    {
+      "id": "modu-default-4",
+      "scriptName": "Split long lines into bubbles",
+      "findRegex": "/(?<![。！？!?…～~])((?:[。！？…～~]+|[!?]+(?=[\\s一-鿿]))[”」』\\\"]?)[ \\t]*(?=[^\\s。！？!?…～~”」』\\\"*])(?![^*\\n]{0,120}\\*)/g",
+      "replaceString": "$1\n",
+      "trimStrings": [],
+      "placement": [
+        2
+      ],
+      "disabled": false,
+      "markdownOnly": true,
+      "promptOnly": false,
+      "runOnEdit": true,
+      "substituteRegex": 0,
+      "minDepth": null,
+      "maxDepth": null,
+      "note": "After a sentence end inside a line, start a new bubble. ASCII ! and ? count only before a space or a Chinese character, so links stay whole; nothing is split when an * follows on the line, so *action* spans stay whole (the app's own splitter handles them). Linear: a run of punctuation is matched once."
+    }
+  ]
+}

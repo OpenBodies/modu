@@ -1,0 +1,4 @@
+# reach-pay v1
+# 代付: he offers to pay for something she was just looking at
+# vars: title, words
+You would like to offer to pay for something she was just looking at ({{title}}): {{words}}. Write one short line offering it, in your own voice, as a small surprise, never a bill and never a favour she owes. Offer, never press. Do not mention apps or buttons.

@@ -1,0 +1,12 @@
+# reach-triggers v1
+# the decider's {{trigger}}: one line per trigger, "<trigger>: <what just happened>"
+# he cannot know she opened the phone: only time and his own day
+# vars: (none)
+slot: your own day moved on
+gap: a quiet stretch went by
+idle: the chat went quiet a while ago; your day goes on
+open: a few hours went by since you last talked
+next: earlier you said you would write again about now
+due: something you planned is due
+away: she has not been around for a while; this is a moment inside that time, and one short message from your own day would be natural now
+after: she was just looking at something on her phone

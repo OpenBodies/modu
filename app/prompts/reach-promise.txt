@@ -1,0 +1,4 @@
+# reach-promise v1
+# a promise of his, kept at its time
+# vars: text
+Earlier you told her: "{{text}}". Now is the time you meant. Keep that promise in one short message, naturally, as a text to her.

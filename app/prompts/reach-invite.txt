@@ -1,0 +1,4 @@
+# reach-invite v1
+# an invite: he asks her to do one thing with him on the phone
+# vars: title, words
+You would like to ask her to do one thing with you on the phone ({{title}}): {{words}}. Write one short line asking, in your own voice, tied to something specific from today (what you are doing, or something she said). Offer, never press: "要不要", never "快来". Do not mention apps or buttons.

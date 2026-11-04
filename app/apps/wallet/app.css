@@ -1,0 +1,29 @@
+/* 钱包: styles for its own screen only. Colours come from the skin's tokens. */
+#s-app-wallet .a-wallet-top{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:16px 16px 12px}
+#s-app-wallet .a-wallet-top small{font-size:12.5px;color:var(--m-muted)}
+#s-app-wallet .a-wallet-top b{font-family:var(--m-display);font-size:32px;font-weight:600;letter-spacing:.01em;color:var(--m-fg)}
+#s-app-wallet .a-wallet-acts{display:flex;width:100%;justify-content:space-around;margin-top:14px;padding-top:12px;border-top:1px solid var(--m-line)}
+#s-app-wallet .a-wallet-acts button{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12.5px;color:var(--m-fg2);min-width:64px}
+#s-app-wallet .a-wallet-acts i{display:flex;width:42px;height:42px;border-radius:14px;align-items:center;justify-content:center;background:var(--m-accent);color:var(--m-accent-fg)}
+#s-app-wallet .a-wallet-row{align-items:center}
+#s-app-wallet .a-wallet-what{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
+#s-app-wallet .a-wallet-what > span{color:var(--m-fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#s-app-wallet .a-wallet-what small{font-size:11.5px;color:var(--m-muted);margin-top:1px}
+#s-app-wallet .a-wallet-amt{flex:0 0 auto;font-variant-numeric:tabular-nums;color:var(--m-fg)}
+#s-app-wallet .a-wallet-in{color:var(--m-accent)}
+#s-app-wallet .a-wallet-zero{color:var(--m-muted);text-decoration:line-through}
+/* tabs (我的 · 他的钱包 · 模拟炒股), 零钱通, 亲属卡, the 发送成功 page, the toy banner */
+#s-app-wallet .a-wallet-tabs{margin:0 0 4px}
+#s-app-wallet .a-wallet-his small{font-size:12px}
+#s-app-wallet .a-wallet-save .val button,#s-app-wallet .a-wallet-card button.val{color:var(--m-accent);font-size:14px}
+#s-app-wallet .a-wallet-save #wSave{font-variant-numeric:tabular-nums}
+#s-app-wallet .a-wallet-stock small{font-size:11px;color:var(--m-muted)}
+#s-app-wallet .a-wallet-toy{padding:10px 14px;border-radius:var(--m-radius);border:1px dashed var(--m-line);background:var(--m-soft);color:var(--m-fg2);font-size:12.5px;line-height:1.6}
+#s-app-wallet .a-wallet-toy b{display:inline-block;padding:0 8px;margin-right:4px;border-radius:999px;background:var(--m-accent);color:var(--m-accent-fg);font-weight:600;font-size:11.5px}
+#s-app-wallet .a-wallet-sent{display:flex;flex-direction:column;align-items:center;gap:8px;padding:48px 16px 16px;text-align:center}
+#s-app-wallet .a-wallet-ok{display:flex;width:64px;height:64px;border-radius:50%;align-items:center;justify-content:center;background:var(--m-accent);color:var(--m-accent-fg)}
+#s-app-wallet .a-wallet-ok .ic{width:36px;height:36px}
+#s-app-wallet .a-wallet-sent b{font-size:18px;color:var(--m-fg)}
+#s-app-wallet .a-wallet-sentamt{font-family:var(--m-display);font-size:34px;font-weight:600;color:var(--m-fg);font-variant-numeric:tabular-nums}
+#s-app-wallet .a-wallet-sent small{color:var(--m-muted);margin-bottom:18px}
+#s-app-wallet .a-wallet-sent .btn,#s-app-wallet .a-wallet-sent .btn2{max-width:320px}

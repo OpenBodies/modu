@@ -1,0 +1,38 @@
+/* 购物: styles for its own screen only Colours come from the skin's tokens. 外卖 has the same rules under #s-app-food. */
+#s-app-shop .a-shop-pick{display:flex;align-items:center;gap:12px;padding:12px 14px;text-align:left;width:100%;box-sizing:border-box}
+#s-app-shop .a-shop-pick i{display:flex;width:40px;height:40px;border-radius:13px;align-items:center;justify-content:center;background:var(--m-accent);color:var(--m-accent-fg);flex:0 0 auto}
+#s-app-shop .a-shop-pick > span:not(.a-shop-go){flex:1;display:flex;flex-direction:column;min-width:0}
+#s-app-shop .a-shop-pick b{font-size:15px;font-weight:600;color:var(--m-fg)}
+#s-app-shop .a-shop-pick small{font-size:12px;color:var(--m-muted)}
+#s-app-shop .a-shop-go{color:var(--m-muted);font-size:18px}
+#s-app-shop .a-shop-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#s-app-shop .a-shop-item{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:12px 13px;text-align:left;min-width:0;box-sizing:border-box}
+#s-app-shop .a-shop-item i{display:flex;width:34px;height:34px;border-radius:11px;align-items:center;justify-content:center;background:var(--m-soft);color:var(--m-ink);margin-bottom:4px}
+#s-app-shop .a-shop-item b{font-size:14.5px;font-weight:600;color:var(--m-fg)}
+#s-app-shop .a-shop-item small{font-size:11.5px;color:var(--m-muted);line-height:1.45;min-height:2.9em}
+#s-app-shop .a-shop-item span{font-size:14px;color:var(--m-accent);font-variant-numeric:tabular-nums;margin-top:2px}
+#s-app-shop .a-shop-row > span:first-child{display:flex;flex-direction:column;flex:1 1 auto;min-width:0}
+#s-app-shop .a-shop-row small{font-size:11.5px;color:var(--m-muted)}
+#s-app-shop .a-shop-row .val{font-variant-numeric:tabular-nums}
+#s-app-shop .a-shop-shelfbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#s-app-shop .a-shop-again{background:none;border:0;color:var(--m-accent);font-size:13px;padding:6px 2px;cursor:pointer}
+#s-app-shop .a-shop-again[disabled]{color:var(--m-muted)}
+#s-app-shop .a-shop-head{display:flex;align-items:center;gap:12px;padding:14px}
+#s-app-shop .a-shop-head i{display:flex;width:44px;height:44px;border-radius:14px;align-items:center;justify-content:center;background:var(--m-soft);color:var(--m-ink);flex:0 0 auto}
+#s-app-shop .a-shop-head > span:not(.a-shop-price){flex:1;display:flex;flex-direction:column;min-width:0}
+#s-app-shop .a-shop-head b{font-size:16px;font-weight:600;color:var(--m-fg)}
+#s-app-shop .a-shop-head small{font-size:12px;color:var(--m-muted)}
+#s-app-shop .a-shop-price{font-size:15px;color:var(--m-accent);font-variant-numeric:tabular-nums}
+#s-app-shop .a-shop-reply{padding:12px 14px}
+#s-app-shop .a-shop-reply small{font-size:12px;color:var(--m-muted)}
+#s-app-shop .a-shop-reply p{margin:4px 0 0;font-size:14.5px;line-height:1.55;color:var(--m-fg);white-space:pre-wrap}
+#s-app-shop .a-shop-track{padding:10px 14px}
+#s-app-shop .a-shop-step{display:flex;gap:12px;align-items:flex-start;position:relative;padding:6px 0;color:var(--m-muted)}
+#s-app-shop .a-shop-step i{width:9px;height:9px;border-radius:50%;background:var(--m-soft);margin-top:6px;flex:0 0 auto}
+#s-app-shop .a-shop-step.on i{background:var(--m-accent)}
+#s-app-shop .a-shop-step.now{color:var(--m-fg)}
+#s-app-shop .a-shop-step span{display:flex;flex-direction:column}
+#s-app-shop .a-shop-step b{font-size:14px;font-weight:500}
+#s-app-shop .a-shop-step small{font-size:11.5px;color:var(--m-muted)}
+#s-app-shop .a-shop-thing > span:first-child{display:flex;flex-direction:column;flex:1 1 auto;min-width:0}
+#s-app-shop .a-shop-thing small{font-size:11.5px;color:var(--m-muted)}

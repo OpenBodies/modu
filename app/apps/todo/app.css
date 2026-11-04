@@ -1,0 +1,14 @@
+/* 清单: only inside its own screen; colours are skin tokens */
+#s-app-todo .a-todo-it{justify-content:flex-start}
+#s-app-todo .a-todo-it > span{flex:1 1 auto;min-width:0;color:var(--m-fg)}
+#s-app-todo .a-todo-it.done > span{text-decoration:line-through;color:var(--m-muted)}
+#s-app-todo .a-todo-ck{width:20px;height:20px;border-radius:50%;border:1.6px solid var(--m-muted);flex:0 0 auto;box-sizing:border-box;position:relative}
+#s-app-todo .a-todo-it.done .a-todo-ck{background:var(--m-accent);border-color:var(--m-accent)}
+#s-app-todo .a-todo-it.done .a-todo-ck:after{content:"";position:absolute;left:5.5px;top:2px;width:5px;height:10px;border:solid var(--m-accent-fg);border-width:0 2px 2px 0;transform:rotate(45deg)}
+#s-app-todo .a-todo-x{font-size:13px;flex:0 0 auto}
+#s-app-todo .a-todo-add input{text-align:left;color:var(--m-fg);font-size:16px}
+#s-app-todo .a-todo-add .val{color:var(--m-accent);font-weight:600;flex:0 0 auto}
+#s-app-todo .a-todo-clear{align-self:center;font-size:13.5px;color:var(--m-fg2);padding:6px 14px}
+/* 告诉他, she shows him this one task; 已告诉 once he has seen it */
+#s-app-todo .a-todo-tell{font-size:12.5px;flex:0 0 auto;margin-right:10px;color:var(--m-accent)}
+#s-app-todo .a-todo-tell.on{color:var(--m-muted)}
