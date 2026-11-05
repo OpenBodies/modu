@@ -23,7 +23,7 @@ async function loadContacts(){
     return false;
   };
   // recovery reads and writes the list itself; every call (two at once too) then reads the list it left
-  // then a removal a reload cut off (替换's old one, the default char) is finished, once the new companion is in
+  // then a removal a reload cut off (替换's old one) is finished, once the new companion is in
   if (!recovering) recovering = read().then(ok => ok ? recoverSaves().then(async back => { await finishRemovals(); return back; }) : []).catch(e => console.error('recover:', e));
   await recovering;
   await read();
@@ -85,11 +85,12 @@ const YOUNG_SAVE = 10 * 60 * 1000;
 const tabsUnlocked = () => storage().kind === 'indexeddb' && !(typeof navigator !== 'undefined' && navigator.locks && navigator.locks.request);
 const now = () => core.now().getTime();
 // --- A removal that waits for a save -------------------------------------------------------------------------------
-// planRemoval(name, [{ id, ifUnused }]) keeps in her kv ('removeAfter' { v, writer, rev, at, name, before, remove }) who goes
+// planRemoval(name, [{ id }]) keeps in her kv ('removeAfter' { v, writer, rev, at, name, before, remove }) who goes
 // once a companion called `name` that was not here before is in her contacts; planRemoval(null) forgets it. finishRemovals()
 // does it then (saveImport right after its save; loadContacts at the next start, when a reload cut in): a new companion
-// listed → each one goes (never one she has open; at the next start, one that was open hands that place to the new one;
-// ifUnused: only while she has never written to him); none → nothing is removed. Either way the note goes.
+// listed → each one goes (never one she has open; at the next start, one that was open hands that place to the new one);
+// none → nothing is removed. Either way the note goes. An entry marked ifUnused, which a plan an older build saved may
+// still hold, was never her yes: it stays.
 // an ephemeral core (a host's, a test's) keeps the plan for this run only
 let planHere = null;
 async function planRemoval(name, remove){
@@ -107,7 +108,7 @@ async function finishRemovals(){
   if (arrived) for (const x of p.remove){
     const c = core.contacts.find(y => y.id === x.id);
     if (!c || (c.id === core.currentId && store.name)) continue;
-    if (x.ifUnused && await usedBy(c)) continue;
+    if (x.ifUnused) continue;
     if (c.id === core.currentId) core.currentId = arrived.id;
     try { await removeContact(c.id, { files: true }); } catch(e){ console.error(e); }
   }
@@ -210,9 +211,13 @@ async function removeContact(id, opts = {}){
 // never brings him back. The demo (ephemeral) never seeds.
 // char_zh.png in Chinese mode, char_en.png with { lang:'en' }.
 const FIRST_COMPANION = { zh: 'char_zh.png', en: 'char_en.png' };
+// a first run that failed leaves its reason in core.firstRunError ('' when it did not fail), so 搬家 can say it
+// instead of opening with nobody and no word why
+core.firstRunError = '';
 async function firstRun(base = '../samples/', { lang = 'zh' } = {}){
   const first = FIRST_COMPANION[lang] || FIRST_COMPANION.zh;
   if (core.ephemeral) return null;
+  core.firstRunError = '';
   try {
     { const note = await kvGet('firstRun'); if (note){ await newSeedPicture(base, note); return null; } }
     await loadContacts();
@@ -236,7 +241,7 @@ async function firstRun(base = '../samples/', { lang = 'zh' } = {}){
       return true;
     });
     return seeded ? current() : null;
-  } catch(e){ console.error('first run:', e); return null; }   // tried again next time
+  } catch(e){ console.error('first run:', e); core.firstRunError = String((e && (e.message || e.name)) || e || '?').slice(0, 200); return null; }   // tried again next time
 }
 // The default companion's old picture (a flat dark cap, read as a 锅盖头) was seeded once, so a phone that has
 // him keeps it. Once, at a later firstRun: the companion firstRun seeded, still in her in-browser folder, whose picture is
@@ -274,8 +279,8 @@ async function saveWaiting(){
   try { return !!(L && L.query && (await L.query()).pending.some(x => x.name === 'modu-save')); } catch { return false; }
 }
 // The default companion once she moves her own in. → { id, name, used } while the one firstRun seeded is still
-// here, else null. `used`: she has written to him (a message of hers in his chat). The page lets an unused one go quietly
-// and asks first (as deleting a contact does) when she used him. firstCompanion({ keep: true }) is her answer "keep him":
+// here, else null. `used`: she has written to him (a message of hers in his chat). The page leaves an unused one in 聊天
+// and asks (as deleting a contact does) when she used him. firstCompanion({ keep: true }) is her answer "keep him":
 // remembered (kv 'firstRun'), so he is not asked about again.
 async function firstCompanion(o = {}){
   let note = null; try { note = await kvGet('firstRun'); } catch {}

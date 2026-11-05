@@ -1430,7 +1430,22 @@ async function stageImport(files, opts = {}){
   return out;
 }
 
-Object.assign(core, { readPngTexts, normaliseCard, readCardFile, parseChat, chooseCaiChat, stageImport, answerPronoun });
+// 搬家 → 新建一个. A companion from what she typed: his name, one line about him, an optional greeting and a few
+// lines of personality, made into a V2 card ({ spec: 'chara_card_v2', data }) as a .json File. The page stages it with
+// stageImport like any card she picks, so it is saved the same way a PNG card is (card.json, manifest, memory). Nothing here
+// adds to what she typed. → File; throws { code: 'no-name' } with no name.
+function newCard(o = {}){
+  const t = k => String((o && o[k]) || '').replace(/\r\n?/g, '\n').trim();
+  const name = t('name').replace(/\s+/g, ' ').slice(0, 60);
+  if (!name) throw failure('no-name', '', '没有名字');
+  const card = { spec: 'chara_card_v2', spec_version: '2.0', data: {
+    name, description: t('description'), personality: t('personality'), scenario: '', first_mes: t('first_mes'), mes_example: '',
+    creator_notes: '', system_prompt: '', post_history_instructions: '', alternate_greetings: [], tags: [], creator: '',
+    character_version: '', extensions: {} } };
+  return new File([JSON.stringify(card, null, 2)], name.replace(/[\\/:*?"<>|]+/g, '_') + '.json', { type: 'application/json' });
+}
+
+Object.assign(core, { readPngTexts, normaliseCard, readCardFile, parseChat, chooseCaiChat, stageImport, answerPronoun, newCard });
 })(globalThis[Symbol.for('modu.core')]);
 // app/core/store.js: the store: the companion currently loaded, his folder (read, written back), the bundled samples.
 // One of the core's files, loaded in the order of app/core/index.json; app/core.js is all of them joined
@@ -1457,7 +1472,7 @@ function buildStoreFiles(st){
   // her own pronouns.json from the folder stays hers, byte for byte; a pronoun her params give needs no note
   if (st.pronoun && st.pronoun.pronouns && st.pronoun.note !== false && !(st.pronoun.from === 'folder' && folder[PRONOUNS_NOTE])) files[PRONOUNS_NOTE] = JSON.stringify({ v: 1, pronouns: st.pronoun.pronouns, writer: 'import', rev: 1, at: st.importedAt || now().getTime() }, null, 2);
   files['manifest.json'] = JSON.stringify({
-    store: STORE_FORMAT, name, imported_from: st.source === '酒馆' ? 'SillyTavern files' : st.caiApp ? 'c.ai export (c.ai app)' : 'c.ai export (cai tools)',
+    store: STORE_FORMAT, name, imported_from: st.made || st.source === 'Modu' ? 'made in Modu (新建一个)' : st.source === '酒馆' ? 'SillyTavern files' : st.caiApp ? 'c.ai export (c.ai app)' : 'c.ai export (cai tools)',
     imported_at: new Date(st.importedAt || now().getTime()).toISOString(), imported_msgs: st.msgs.length, files: Object.keys(files).concat(st.image ? ['card.png'] : []), records: {}, memory_format: MEMORY_FORMAT,
     card_folder: st.folder && st.folder.list && Object.keys(st.folder.list).length ? st.folder.list : undefined,
     seeded: st.seeded ? true : undefined,   // the default companion a fresh install put here (firstRun), not one she brought
@@ -1519,11 +1534,12 @@ async function freeName(root, name){
     if (empty) return n;
   }
 }
-// opts.remove = [{ id, ifUnused }]: companions that go once he is safely in (替换's old one; the default
-// char she never wrote to, ifUnused). Kept in her kv ('removeAfter') BEFORE the save, done after it, and finished at the next
-// start (finishRemovals) when a reload cut in between; nothing is removed unless the new companion is in, whole.
+// opts.remove = [{ id }]: companions she said yes to losing (替换's old one), gone once he is safely in. Kept in her kv
+// ('removeAfter') BEFORE the save, done after it, and finished at the next start (finishRemovals) when a reload cut in
+// between; nothing is removed unless the new companion is in, whole. An entry with ifUnused is a guess, not her yes: it
+// removes nobody, so no caller can take a companion away quietly through a save.
 async function saveImport(st, root, opts = {}){
-  const remove = ((opts && opts.remove) || []).filter(x => x && x.id).map(x => ({ id: String(x.id), ifUnused: !!x.ifUnused }));
+  const remove = ((opts && opts.remove) || []).filter(x => x && x.id && !x.ifUnused).map(x => ({ id: String(x.id) }));
   if (!remove.length) return saveInto(st, root, false);
   await core.planRemoval(st.name || 'companion', remove);
   let dir;
@@ -1656,7 +1672,7 @@ async function loadFromDir(dir){
   store.card = cj ? cj.data : null; store.cardSource = cj ? cj.source : null;
   store.meta = c.meta; store.msgs = c.msgs;
   store.name = (store.card && store.card.name) || c.meta.character_name || dir.name;
-  store.source = mj && /SillyTavern/i.test(mj.imported_from) ? '酒馆' : 'c.ai';
+  store.source = mj && /SillyTavern/i.test(mj.imported_from) ? '酒馆' : mj && /made in Modu/.test(mj.imported_from) ? 'Modu' : 'c.ai';   // 'Modu': made in 新建一个
   store.importedAt = importedAt;
   store.seeded = !!(mj && mj.seeded);   // firstRun's default companion: his arrival is not a moment they were together
   store.avatarURL = av ? URL.createObjectURL(av) : '';
@@ -1772,7 +1788,7 @@ async function loadContacts(){
     return false;
   };
   // recovery reads and writes the list itself; every call (two at once too) then reads the list it left
-  // then a removal a reload cut off (替换's old one, the default char) is finished, once the new companion is in
+  // then a removal a reload cut off (替换's old one) is finished, once the new companion is in
   if (!recovering) recovering = read().then(ok => ok ? recoverSaves().then(async back => { await finishRemovals(); return back; }) : []).catch(e => console.error('recover:', e));
   await recovering;
   await read();
@@ -1834,11 +1850,12 @@ const YOUNG_SAVE = 10 * 60 * 1000;
 const tabsUnlocked = () => storage().kind === 'indexeddb' && !(typeof navigator !== 'undefined' && navigator.locks && navigator.locks.request);
 const now = () => core.now().getTime();
 // --- A removal that waits for a save -------------------------------------------------------------------------------
-// planRemoval(name, [{ id, ifUnused }]) keeps in her kv ('removeAfter' { v, writer, rev, at, name, before, remove }) who goes
+// planRemoval(name, [{ id }]) keeps in her kv ('removeAfter' { v, writer, rev, at, name, before, remove }) who goes
 // once a companion called `name` that was not here before is in her contacts; planRemoval(null) forgets it. finishRemovals()
 // does it then (saveImport right after its save; loadContacts at the next start, when a reload cut in): a new companion
-// listed → each one goes (never one she has open; at the next start, one that was open hands that place to the new one;
-// ifUnused: only while she has never written to him); none → nothing is removed. Either way the note goes.
+// listed → each one goes (never one she has open; at the next start, one that was open hands that place to the new one);
+// none → nothing is removed. Either way the note goes. An entry marked ifUnused, which a plan an older build saved may
+// still hold, was never her yes: it stays.
 // an ephemeral core (a host's, a test's) keeps the plan for this run only
 let planHere = null;
 async function planRemoval(name, remove){
@@ -1856,7 +1873,7 @@ async function finishRemovals(){
   if (arrived) for (const x of p.remove){
     const c = core.contacts.find(y => y.id === x.id);
     if (!c || (c.id === core.currentId && store.name)) continue;
-    if (x.ifUnused && await usedBy(c)) continue;
+    if (x.ifUnused) continue;
     if (c.id === core.currentId) core.currentId = arrived.id;
     try { await removeContact(c.id, { files: true }); } catch(e){ console.error(e); }
   }
@@ -1959,9 +1976,13 @@ async function removeContact(id, opts = {}){
 // never brings him back. The demo (ephemeral) never seeds.
 // char_zh.png in Chinese mode, char_en.png with { lang:'en' }.
 const FIRST_COMPANION = { zh: 'char_zh.png', en: 'char_en.png' };
+// a first run that failed leaves its reason in core.firstRunError ('' when it did not fail), so 搬家 can say it
+// instead of opening with nobody and no word why
+core.firstRunError = '';
 async function firstRun(base = '../samples/', { lang = 'zh' } = {}){
   const first = FIRST_COMPANION[lang] || FIRST_COMPANION.zh;
   if (core.ephemeral) return null;
+  core.firstRunError = '';
   try {
     { const note = await kvGet('firstRun'); if (note){ await newSeedPicture(base, note); return null; } }
     await loadContacts();
@@ -1985,7 +2006,7 @@ async function firstRun(base = '../samples/', { lang = 'zh' } = {}){
       return true;
     });
     return seeded ? current() : null;
-  } catch(e){ console.error('first run:', e); return null; }   // tried again next time
+  } catch(e){ console.error('first run:', e); core.firstRunError = String((e && (e.message || e.name)) || e || '?').slice(0, 200); return null; }   // tried again next time
 }
 // The default companion's old picture (a flat dark cap, read as a 锅盖头) was seeded once, so a phone that has
 // him keeps it. Once, at a later firstRun: the companion firstRun seeded, still in her in-browser folder, whose picture is
@@ -2023,8 +2044,8 @@ async function saveWaiting(){
   try { return !!(L && L.query && (await L.query()).pending.some(x => x.name === 'modu-save')); } catch { return false; }
 }
 // The default companion once she moves her own in. → { id, name, used } while the one firstRun seeded is still
-// here, else null. `used`: she has written to him (a message of hers in his chat). The page lets an unused one go quietly
-// and asks first (as deleting a contact does) when she used him. firstCompanion({ keep: true }) is her answer "keep him":
+// here, else null. `used`: she has written to him (a message of hers in his chat). The page leaves an unused one in 聊天
+// and asks (as deleting a contact does) when she used him. firstCompanion({ keep: true }) is her answer "keep him":
 // remembered (kv 'firstRun'), so he is not asked about again.
 async function firstCompanion(o = {}){
   let note = null; try { note = await kvGet('firstRun'); } catch {}
@@ -2740,7 +2761,7 @@ function stateDecl(key, d){
     decay,
     // the bond's `unlocks [{ entry, min, min_days }]` are read as gates in any declaration (the same names serve all three)
     gates: [].concat(d.gates || [], [].concat(d.unlocks || []).filter(u => u && typeof u === 'object' && u.min != null).map(u => ({ at: u.min, min_days: u.min_days, asks: u.asks, unlock: [u.entry] }))).filter(g => g && g.at != null).map(g => Object.assign({ at: num(g.at, hi), min_days: Math.max(0, num(g.min_days, 0)), unlock: ids(g.unlock || g.ids) }, g.asks != null ? { asks: Math.max(0, num(g.asks, 0)) } : {})).sort((a, b) => a.at - b.at),
-    // the public schema's other bond rules (characters/params/params.schema.json): pace multiplies every change before the
+    // the public schema's other bond rules: pace multiplies every change before the
     // caps; tiers name levels; unlocks_stay false lets a gate close again below its value; away and echo are kept as given
     pace: Math.max(0, num(d.pace, 1)),
     tiers: [].concat(d.tiers || []).filter(x => x && x.min != null).map(x => ({ id: String(x.id || ''), name: String(x.name || ''), min: num(x.min, 0) })).sort((a, b) => a.min - b.min),
@@ -7019,6 +7040,7 @@ globalThis.ModuCore = {
   EMOTIONS, store, on(f){ listeners.add(f); return () => listeners.delete(f); },
   // import + store
   readPngTexts, normaliseCard, readCardFile, parseChat, stageImport, chooseCaiChat, buildStoreFiles, saveImport, loadStaged,
+  newCard: core.newCard,   // 搬家 → 新建一个 (a V2 card from what she typed, as a .json File)
   loadFromDir, loadDemo, appendToChat, phoneRoot, canPickFolder,
   // contacts
   get contacts(){ return core.contacts; }, get currentId(){ return core.currentId; }, set ephemeral(v){ core.ephemeral = v; },
@@ -7031,6 +7053,7 @@ globalThis.ModuCore = {
   loadContacts, openContact, removeContact, canOpenWithoutAsking, current, setAvatar, setPronouns, msgDate,
   // first run; the default companion once she moves her own in
   firstRun, greetingFor, firstCompanion,
+  get firstRunError(){ return core.firstRunError || ''; },   // why the last firstRun failed ('' when it did not)
   // records (store 0.2): one folder per record type
   records,
   // her phone: her own store beside his folders, the same record API; and how he may know

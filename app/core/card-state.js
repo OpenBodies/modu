@@ -60,7 +60,7 @@ function stateDecl(key, d){
     decay,
     // the bond's `unlocks [{ entry, min, min_days }]` are read as gates in any declaration (the same names serve all three)
     gates: [].concat(d.gates || [], [].concat(d.unlocks || []).filter(u => u && typeof u === 'object' && u.min != null).map(u => ({ at: u.min, min_days: u.min_days, asks: u.asks, unlock: [u.entry] }))).filter(g => g && g.at != null).map(g => Object.assign({ at: num(g.at, hi), min_days: Math.max(0, num(g.min_days, 0)), unlock: ids(g.unlock || g.ids) }, g.asks != null ? { asks: Math.max(0, num(g.asks, 0)) } : {})).sort((a, b) => a.at - b.at),
-    // the public schema's other bond rules (characters/params/params.schema.json): pace multiplies every change before the
+    // the public schema's other bond rules: pace multiplies every change before the
     // caps; tiers name levels; unlocks_stay false lets a gate close again below its value; away and echo are kept as given
     pace: Math.max(0, num(d.pace, 1)),
     tiers: [].concat(d.tiers || []).filter(x => x && x.min != null).map(x => ({ id: String(x.id || ''), name: String(x.name || ''), min: num(x.min, 0) })).sort((a, b) => a.min - b.min),

@@ -44,6 +44,32 @@ import.card.memory = 记忆 ✓ {n} 条
 import.card.memory.dated = ，其中 {n} 条带日期
 import.card.from = 来自 {source}
 import.card.from.sample = 来自 示例
+# 新建一个: a companion from a name and a few lines, with no card file (English after each line, for an English page later)
+import.card.from.new = 新建的
+#   en: Made here
+import.new = 没有角色卡？新建一个
+#   en: No card file? Make one
+import.new.title = 新建一个联系人
+#   en: Make a companion
+import.new.name = 名字
+#   en: Name
+import.new.desc = 一句话介绍他（例如：住在楼下的乐队鼓手，嘴硬心软）
+#   en: One line about him (e.g. the drummer downstairs, gruff but kind)
+import.new.greet = 他的第一句话（可不填）
+#   en: His first words (optional)
+import.new.pers = 他的性格，写几句就好（可不填）
+#   en: His personality, a few lines (optional)
+import.new.foot = 写好后会做成一张角色卡，保存在这台手机上，和导入的角色卡一样。之后可以在 设置 → 备份 里导出。
+#   en: This becomes a character card kept on this phone, like an imported one. You can export it from Settings → Backup.
+import.new.make = 做好了
+#   en: Done
+import.new.noname = 先给他起个名字
+#   en: Give him a name first
+import.new.nodesc = 写一句话介绍他
+#   en: Write one line about him
+# the default companion could not be put here at the first start (the reason after the colon)
+import.first.fail = 默认联系人没能放进来，可以导入角色卡或新建一个。原因：{why}
+#   en: The default companion could not be added; bring a card or make one. Reason: {why}
 import.start = 开始聊天
 import.open = 打开已保存的角色文件夹
 import.error.read = 无法读取该文档：
@@ -141,6 +167,11 @@ home.days = 在一起第 {n} 天
 # the 他 widget when nobody is in 聊天 (everyone deleted)
 home.nobody = 还没有联系人
 home.nobody.sub = 点击添加联系人
+# a screen that is his (聊天, 记忆, his apps), opened while nobody is here yet
+nobody.line = 这里还没有联系人。去搬家导入角色卡，或者新建一个，就可以用了。
+#   en: Nobody is here yet. Bring a card or make one in Move in, then this opens.
+nobody.go = 去搬家
+#   en: Go to Move in
 # 一起听: the widget looks like a player; it plays nothing yet
 music.label = 一起听
 music.title = 午后的光

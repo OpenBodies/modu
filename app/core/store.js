@@ -23,7 +23,7 @@ function buildStoreFiles(st){
   // her own pronouns.json from the folder stays hers, byte for byte; a pronoun her params give needs no note
   if (st.pronoun && st.pronoun.pronouns && st.pronoun.note !== false && !(st.pronoun.from === 'folder' && folder[PRONOUNS_NOTE])) files[PRONOUNS_NOTE] = JSON.stringify({ v: 1, pronouns: st.pronoun.pronouns, writer: 'import', rev: 1, at: st.importedAt || now().getTime() }, null, 2);
   files['manifest.json'] = JSON.stringify({
-    store: STORE_FORMAT, name, imported_from: st.source === '酒馆' ? 'SillyTavern files' : st.caiApp ? 'c.ai export (c.ai app)' : 'c.ai export (cai tools)',
+    store: STORE_FORMAT, name, imported_from: st.made || st.source === 'Modu' ? 'made in Modu (新建一个)' : st.source === '酒馆' ? 'SillyTavern files' : st.caiApp ? 'c.ai export (c.ai app)' : 'c.ai export (cai tools)',
     imported_at: new Date(st.importedAt || now().getTime()).toISOString(), imported_msgs: st.msgs.length, files: Object.keys(files).concat(st.image ? ['card.png'] : []), records: {}, memory_format: MEMORY_FORMAT,
     card_folder: st.folder && st.folder.list && Object.keys(st.folder.list).length ? st.folder.list : undefined,
     seeded: st.seeded ? true : undefined,   // the default companion a fresh install put here (firstRun), not one she brought
@@ -85,11 +85,12 @@ async function freeName(root, name){
     if (empty) return n;
   }
 }
-// opts.remove = [{ id, ifUnused }]: companions that go once he is safely in (替换's old one; the default
-// char she never wrote to, ifUnused). Kept in her kv ('removeAfter') BEFORE the save, done after it, and finished at the next
-// start (finishRemovals) when a reload cut in between; nothing is removed unless the new companion is in, whole.
+// opts.remove = [{ id }]: companions she said yes to losing (替换's old one), gone once he is safely in. Kept in her kv
+// ('removeAfter') BEFORE the save, done after it, and finished at the next start (finishRemovals) when a reload cut in
+// between; nothing is removed unless the new companion is in, whole. An entry with ifUnused is a guess, not her yes: it
+// removes nobody, so no caller can take a companion away quietly through a save.
 async function saveImport(st, root, opts = {}){
-  const remove = ((opts && opts.remove) || []).filter(x => x && x.id).map(x => ({ id: String(x.id), ifUnused: !!x.ifUnused }));
+  const remove = ((opts && opts.remove) || []).filter(x => x && x.id && !x.ifUnused).map(x => ({ id: String(x.id) }));
   if (!remove.length) return saveInto(st, root, false);
   await core.planRemoval(st.name || 'companion', remove);
   let dir;
@@ -222,7 +223,7 @@ async function loadFromDir(dir){
   store.card = cj ? cj.data : null; store.cardSource = cj ? cj.source : null;
   store.meta = c.meta; store.msgs = c.msgs;
   store.name = (store.card && store.card.name) || c.meta.character_name || dir.name;
-  store.source = mj && /SillyTavern/i.test(mj.imported_from) ? '酒馆' : 'c.ai';
+  store.source = mj && /SillyTavern/i.test(mj.imported_from) ? '酒馆' : mj && /made in Modu/.test(mj.imported_from) ? 'Modu' : 'c.ai';   // 'Modu': made in 新建一个
   store.importedAt = importedAt;
   store.seeded = !!(mj && mj.seeded);   // firstRun's default companion: his arrival is not a moment they were together
   store.avatarURL = av ? URL.createObjectURL(av) : '';

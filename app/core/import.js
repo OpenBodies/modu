@@ -618,5 +618,20 @@ async function stageImport(files, opts = {}){
   return out;
 }
 
-Object.assign(core, { readPngTexts, normaliseCard, readCardFile, parseChat, chooseCaiChat, stageImport, answerPronoun });
+// 搬家 → 新建一个. A companion from what she typed: his name, one line about him, an optional greeting and a few
+// lines of personality, made into a V2 card ({ spec: 'chara_card_v2', data }) as a .json File. The page stages it with
+// stageImport like any card she picks, so it is saved the same way a PNG card is (card.json, manifest, memory). Nothing here
+// adds to what she typed. → File; throws { code: 'no-name' } with no name.
+function newCard(o = {}){
+  const t = k => String((o && o[k]) || '').replace(/\r\n?/g, '\n').trim();
+  const name = t('name').replace(/\s+/g, ' ').slice(0, 60);
+  if (!name) throw failure('no-name', '', '没有名字');
+  const card = { spec: 'chara_card_v2', spec_version: '2.0', data: {
+    name, description: t('description'), personality: t('personality'), scenario: '', first_mes: t('first_mes'), mes_example: '',
+    creator_notes: '', system_prompt: '', post_history_instructions: '', alternate_greetings: [], tags: [], creator: '',
+    character_version: '', extensions: {} } };
+  return new File([JSON.stringify(card, null, 2)], name.replace(/[\\/:*?"<>|]+/g, '_') + '.json', { type: 'application/json' });
+}
+
+Object.assign(core, { readPngTexts, normaliseCard, readCardFile, parseChat, chooseCaiChat, stageImport, answerPronoun, newCard });
 })(globalThis[Symbol.for('modu.core')]);

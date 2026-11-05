@@ -57,3 +57,16 @@
 #s-app-peek .a-peek-day .empty,#s-app-peek .a-peek-memo .empty{color:inherit;opacity:.72}
 /* the day widget's heading readable on any wallpaper (the accent alone fades on a photo) */
 #s-app-peek .a-peek-day .wd{color:var(--m-glass-fg);opacity:.9}
+/* a short window (UC with its bars, a 360x640 Android, an iPhone SE): page 1 of his home screen fits as hers does
+   (layout.css, under 740 px). His screen has a title bar hers has not, and the rules above (the 54px clock, the 118px card of
+   her) outrank the phone's compact sizes, so his get their own here */
+@media (max-width:500px) and (max-height:740px){
+  #s-app-peek .a-peek-big .clock{font-size:40px}
+  #s-app-peek .a-peek-big .greet{font-size:13px}
+  #s-app-peek .a-peek-herw{min-height:0;padding:8px 14px;gap:12px}
+  #s-app-peek .a-peek-herw .av.a-peek-me{width:44px;height:44px;font-size:18px}
+  #s-app-peek .a-peek-memo{padding-top:8px;padding-bottom:8px}
+  /* his 备忘录 widget keeps two notes here (all of them are in 备忘录 itself), a little closer together */
+  #s-app-peek .a-peek-memo .ti{padding:1px 0}
+  #s-app-peek .a-peek-memo .ti ~ .ti ~ .ti{display:none}
+}

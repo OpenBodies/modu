@@ -24,6 +24,7 @@ globalThis.ModuCore = {
   EMOTIONS, store, on(f){ listeners.add(f); return () => listeners.delete(f); },
   // import + store
   readPngTexts, normaliseCard, readCardFile, parseChat, stageImport, chooseCaiChat, buildStoreFiles, saveImport, loadStaged,
+  newCard: core.newCard,   // 搬家 → 新建一个 (a V2 card from what she typed, as a .json File)
   loadFromDir, loadDemo, appendToChat, phoneRoot, canPickFolder,
   // contacts
   get contacts(){ return core.contacts; }, get currentId(){ return core.currentId; }, set ephemeral(v){ core.ephemeral = v; },
@@ -36,6 +37,7 @@ globalThis.ModuCore = {
   loadContacts, openContact, removeContact, canOpenWithoutAsking, current, setAvatar, setPronouns, msgDate,
   // first run; the default companion once she moves her own in
   firstRun, greetingFor, firstCompanion,
+  get firstRunError(){ return core.firstRunError || ''; },   // why the last firstRun failed ('' when it did not)
   // records (store 0.2): one folder per record type
   records,
   // her phone: her own store beside his folders, the same record API; and how he may know

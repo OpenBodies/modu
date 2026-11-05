@@ -28,7 +28,13 @@ const SECTIONS = ['notes', 'searches', 'songs', 'chats'];
 const chatLang = core => { try { return core.chatLanguage ? core.chatLanguage(core.store.msgs || []) : ''; } catch { return ''; } };
 // whether a line of his records is in the chat's language: in a Chinese chat a line with no Chinese in it
 // (his day's outline, written for his own prompt in English: "wake 07:00, work 09:00–18:00…") is not shown
-const inChatLang = (text, lang) => lang === 'en' || lang === 'other' || /[一-鿿]/.test(String(text || ''));
+// One Chinese place name is not enough ("wake 07:46, work 09:30–12:00 at 工作的地方 …" stays hidden). A line is Chinese when it has Chinese in it and at most a couple
+// of English words beside (two, or one for every two Chinese characters): 和 Alex 去 KTV stays, the outline does not
+const inChatLang = (text, lang) => {
+  if (lang === 'en' || lang === 'other') return true;
+  const s = String(text || ''), han = (s.match(/[一-鿿]/g) || []).length;
+  return han > 0 && (s.match(/[A-Za-z]{2,}/g) || []).length <= Math.max(2, han / 2);
+};
 
 // What he is asked (not shown to her; in code like the core's own rules).
 // The people on his phone come from his own story: friends and colleagues, few or no women (at most one,

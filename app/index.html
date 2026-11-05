@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- the build version's single source (设置 → 关于 shows it) -->
-<meta name="modu-version" content="v0.5.2.2">
+<meta name="modu-version" content="v0.5.3.1">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Modu 小手机</title>
 <link rel="icon" type="image/svg+xml" href="brand/modu-mark.svg">
@@ -157,6 +157,10 @@
       <!-- a tap on c.ai or 酒馆 shows that place's steps in the note under the chips -->
       <div class="src"><span data-t="import.source.cai" data-src="cai" role="button" tabindex="0" aria-pressed="true"></span><span data-t="import.source.st" data-src="st" role="button" tabindex="0" aria-pressed="false"></span><span class="dim" data-t="import.source.gpt"></span><span class="dim" data-t="import.source.ds"></span></div>
       <div class="note" id="impHow" data-t="import.caiapp.how"></div>
+      <!-- no card file at hand: 新建一个 makes him from a name and a few lines (core newCard), then stages him as a card -->
+      <button class="link" id="impNew" data-t="import.new"></button>
+      <!-- the default companion could not be put here at the first start: said, with the reason (core firstRunError) -->
+      <div class="note err" id="impFirst" hidden></div>
       <div class="note" id="impNote"></div>
       <!-- the c.ai app's export has many chats and no names on them: she picks the chat and who he is -->
       <div class="caipick" id="caiPick" hidden>
@@ -404,6 +408,8 @@
       <!-- 设置 → 他找你 (主动, 暂停) and 小事用的模型; app/scheduler.js fills it -->
       <div id="reachBlock"></div>
 
+      <!-- his rows, hidden while nobody is here (设置 itself opens with no companion) -->
+      <div id="himBlock">
       <div class="gtitle" data-name></div>
       <div class="group">
         <button class="opt" data-pick="pronoun"><span data-t="settings.pronoun"></span><span class="val" id="vPron"></span></button>
@@ -412,6 +418,7 @@
         <button class="opt" id="switchChar"><span data-t="settings.switch"></span><span class="val">›</span></button>
       </div>
       <div class="foot" data-t="settings.memory.foot"></div>
+      </div>
       <!-- the preset she brought with his card: which of its blocks are on (read only) -->
       <div id="presetBox" hidden>
         <div class="gtitle" data-t="layers.preset.title"></div>
@@ -461,6 +468,16 @@
         <button class="opt" id="versionRow"><span data-t="settings.about.version"></span><span class="val" id="vVersion"></span></button>
         <button class="opt" id="safeMode"><span data-t="settings.safe"></span><span class="val">›</span></button>
       </div>
+    </div>
+  </section>
+
+  <!-- a screen that is his, opened while nobody is here: one plain line and the way to 搬家 -->
+  <section class="screen" id="s-nobody" hidden>
+    <div class="pad-top"></div>
+    <div class="bar"><button class="back" data-go="home" aria-label="back"><svg class="ic"><use href="#i-back"/></svg></button><div class="title"></div></div>
+    <div class="list">
+      <div class="foot" id="nobodyLine" data-t="nobody.line"></div>
+      <button class="btn" id="nobodyGo" data-t="nobody.go"></button>
     </div>
   </section>
 
@@ -717,7 +734,7 @@ function navStep(from, name, addr, opts){
 }
 // a back button on a screen (data-go names where it leads when there is no way back), and an app's ctx.back(). The page
 // shows the screen at once and lets history follow (stepBack), so a tap that comes before history has moved is not lost
-const usable = a => a && (S.name || ['chats', 'home'].includes(baseOf(a)));   // his screens are gone with him
+const usable = a => a && (S.name || ['chats', 'home', 'settings'].includes(baseOf(a)));   // his screens are gone with him
 function barBack(to = 'home'){
   let i = to === 'home' ? depth - 1 : below(to);
   if (to === 'home') while (i >= 0 && stack[i] && !usable(stack[i])) i--;
@@ -737,13 +754,17 @@ addEventListener('popstate', e => {
   if (!usable(addr)){ if (d > 0) history.back(); else go('home'); return; }
   go(addr, { nav: 'pop' });
 });
+const NOBODY_OK = ['import', 'chats', 'lock', 'home', 'settings', 'soon', 'nobody'];
 function go(name, opts = {}){
   if (name === 'avatar') name = 'body';   // an old 虚拟形象 address opens 身体
-  // with nobody open, the phone itself still works: lock, home, 聊天 (添加联系人) and 搬家
-  if (!['import', 'chats', 'lock', 'home'].includes(name) && !S.name) name = 'chats';
   // outside developer mode, 形象 / 视频通话 / 游戏 / 信箱 open the 开发中 page; the address keeps
   // what she asked for, so a reload comes back to the same page
   const asked = name, held = !DEV && BETA_SOON[name.replace(/@.*$/, '')];
+  // with nobody open, the phone itself still works: lock, home, 聊天 (添加联系人), 搬家 and 设置. His chat is
+  // 聊天 with 添加联系人, as before; any other screen that is his (记忆, 身体, 美化, his apps) says in one line that nobody is
+  // here yet and leads to 搬家
+  if (!held && !S.name && name === 'chat') name = 'chats';
+  else if (!held && !S.name && !NOBODY_OK.includes(name)) name = 'nobody';
   if (held){ if (current !== 'soon') soonFrom = current && current !== 'lock' ? (location.hash.slice(1) || current) : 'home'; soonKey = held; name = 'soon'; }
   else if (name === 'soon') name = 'home';   // a bare #soon (no page named): home, never an empty 开发中 page
   // 'app:<id>@<contact id>' (the address of a contact-scoped app) or go('app:<id>', { contact })
@@ -770,7 +791,7 @@ function go(name, opts = {}){
   if (name === 'lock') renderLock();
   if (name === 'home') renderHome();
   if (name === 'chats') renderChats();
-  if (name === 'import') $('impBack').hidden = !M.contacts.length;
+  if (name === 'import') { $('impBack').hidden = !M.contacts.length; showFirstRun(); }
   if (name === 'chat') { renderChat(true); setTimeout(chatPin, 0); }
   if (name === 'memory') renderMemory();
   if (name === 'settings') { renderSettings(); if (window.ModuScheduler) ModuScheduler.render(); }
@@ -1176,6 +1197,8 @@ async function restage(){
   try {
     for (const k of Object.keys(chosen)) if (!pending.some(p => p.f.name === chosen[k])) delete chosen[k];
     staged = await M.stageImport(pending.map(p => p.f), { pick: chosen });
+    // the card she made in 新建一个 (st.made: its manifest says so, and 搬家 says 新建的 rather than 来自 酒馆)
+    { const mine = pending.find(p => p.kind.startsWith('new:')); if (mine && staged.card && staged.report && staged.report.card && !staged.caiApp && staged.card.name === JSON.parse(await mine.f.text()).data.name){ staged.made = true; staged.source = 'Modu'; } }
     // more files of the same c.ai export (the picture after the chats): what she already chose stays
     if (staged.caiApp && was) staged = await M.chooseCaiChat(staged, was);
     // files a card folder brings, picked on their own with nobody open: say where they belong
@@ -1261,7 +1284,7 @@ function showStaged(){
   if ($('card').hidden){ $('cardName').textContent = $('cardCount').textContent = $('cardFrom').textContent = ''; return; }   // no stale lines
   $('cardName').textContent = staged.name || $('impName').value.trim() || T('import.card.noname');
   $('cardCount').textContent = receipt(staged).join('\n');
-  $('cardFrom').textContent = staged.sample ? T('import.card.from.sample') : T('import.card.from', { source: staged.source });
+  $('cardFrom').textContent = staged.sample ? T('import.card.from.sample') : staged.made ? T('import.card.from.new') : T('import.card.from', { source: staged.source });
   $('cardAv').style.backgroundImage = staged.image ? `url("${URL.createObjectURL(staged.image)}")` : '';
 }
 // what 搬家 understood, one line each, before 开始聊天 (core's staged.report)
@@ -1454,11 +1477,9 @@ async function startImport(o = {}){
       return;
     }
     const firstBefore = DEMO ? null : await M.firstCompanion();
-    // the one she replaces, and the default char she never wrote to, go once the new one is safely in. The core
-    // keeps that plan in her kv before saving and finishes it at the next start if a reload cuts in
-    const remove = [];
-    if (o.replace) remove.push({ id: o.replace.id });
-    if (firstBefore && !firstBefore.used && !(o.replace && o.replace.id === firstBefore.id)) remove.push({ id: firstBefore.id, ifUnused: true });
+    // a companion leaves only on her own yes: here, the one she said 替换 for. He goes once the new one is safely in;
+    // the core keeps that plan in her kv before saving and finishes it at the next start if a reload cuts in
+    const remove = o.replace ? [{ id: o.replace.id }] : [];
     if (DEMO) await M.loadStaged(mine);
     else if (PICK){
       toast(T('import.toast.pick'));
@@ -1473,7 +1494,7 @@ async function startImport(o = {}){
     moving(false); showStaged();
     // she went back while he moved in: she stays where she is and is told, never pulled into his chat later
     if (current === 'import' && !staged) go('chat'); else toast(T('import.saved.away', { name }));
-    // the default companion char she wrote to is not removed quietly: she is asked
+    // the default companion she wrote to: she is asked whether to keep him. One she never wrote to simply stays in 聊天
     if (firstBefore && firstBefore.used && firstBefore.id !== M.currentId && !(o.replace && o.replace.id === firstBefore.id)){
       const c = M.contacts.find(x => x.id === firstBefore.id); if (c) deleteSheet(c, { first: true });
     }
@@ -1520,6 +1541,38 @@ function renderChats(){
 // back in 搬家 while he is still moving in: said, so she does not pick his files again
 function openImport(){ staged = null; pending = []; chosen = {}; pickOpen = false; offerBackup(null); note(''); showStaged(); if (starting) note(T('import.moving', { name: movingName })); go('import'); }
 $('addContact').onclick = openImport;
+$('nobodyGo').onclick = openImport;
+// the first start could not put the default companion here: one line on 搬家 with the reason, never silent
+function showFirstRun(){
+  const why = !M.contacts.length && M.firstRunError;
+  $('impFirst').hidden = !why; $('impFirst').textContent = why ? T('import.first.fail', { why }) : '';
+}
+// 新建一个: his name, one line about him, a greeting (optional) and a few lines of personality. core newCard makes a
+// V2 card of it, and it is staged like a card she picked (pending, restage), so 开始聊天 saves him the same way
+$('impNew').onclick = () => {
+  if (starting) { note(T('import.moving', { name: movingName })); return; }
+  sheet(`<h3></h3><input type="text" id="nwName" maxlength="60" autocomplete="off" enterkeyhint="next"><input type="text" id="nwDesc" autocomplete="off" enterkeyhint="next">
+    <textarea id="nwGreet" rows="2"></textarea><textarea id="nwPers" rows="4"></textarea><p class="foot" id="nwFoot"></p>
+    <button class="btn" id="nwMake"></button><button class="btn2" data-close>${esc(T('cancel'))}</button>`, el => {
+    const q = id => el.querySelector('#' + id);
+    el.querySelector('h3').textContent = T('import.new.title');
+    q('nwName').placeholder = T('import.new.name'); q('nwDesc').placeholder = T('import.new.desc');
+    q('nwGreet').placeholder = T('import.new.greet'); q('nwPers').placeholder = T('import.new.pers');
+    q('nwFoot').textContent = T('import.new.foot'); q('nwMake').textContent = T('import.new.make');
+    q('nwMake').onclick = async () => {
+      const o = { name: q('nwName').value, description: q('nwDesc').value, first_mes: q('nwGreet').value, personality: q('nwPers').value };
+      if (!o.name.trim()) { toast(T('import.new.noname')); q('nwName').focus(); return; }
+      if (!o.description.trim()) { toast(T('import.new.nodesc')); q('nwDesc').focus(); return; }
+      let f; try { f = M.newCard(o); } catch(e){ toast(T('import.new.noname')); return; }
+      closeSheet();
+      // a new companion starts afresh: nothing picked before moves in with him
+      pending = [{ kind: 'new:' + f.name, f }]; chosen = {}; pickOpen = false;
+      taking = taking.then(restage).catch(e => console.error(e));
+      await taking;
+    };
+    setTimeout(() => q('nwName').focus(), 50);
+  });
+};
 // 删除联系人: asked first. His in-browser folder goes with him; a folder on her computer stays there.
 // o.first: the default companion, asked about once her own has moved in: 留着 is remembered, and she stays where she is
 function deleteSheet(c, o = {}){
@@ -2593,6 +2646,9 @@ function renderSettings(){
   // 本机's token row: only with 本机 chosen, and only when 本机 itself shows (the developer switch)
   $('localRows').hidden = !DEV || settings.provider !== 'local'; $('sToken').value = settings.token || '';
   $('lockSw').classList.toggle('on', Lk.on()); $('lockChange').hidden = !Lk.on();
+  // nobody here: 设置 still opens (model, 锁屏, 导入备份, 关于); his rows and 导出备份 wait for him
+  $('himBlock').hidden = !S.name; $('exportBtn').hidden = !S.name;
+  if (!S.name){ $('presetBox').hidden = true; $('cardBox').hidden = true; }
 }
 // 锁屏密码: on / off, and a new code typed twice. Stored hashed (lock.js), never as she typed it.
 $('lockBtn').onclick = () => { Lk.setOn(!Lk.on()); if (Lk.on()) Lk.markUnlocked(); renderSettings(); toast(T(Lk.on() ? 'settings.lock.turned.on' : 'settings.lock.turned.off')); };
