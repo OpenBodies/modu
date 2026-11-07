@@ -80,7 +80,7 @@ function replyText(j){
   const c = j && Array.isArray(j.choices) && j.choices[0], m = c && c.message, why = c && c.finish_reason;
   const text = m && (typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.map(p => (p && typeof p.text === 'string') ? p.text : '').join('') : null);
   const thought = !!(m && (String(m.reasoning || m.reasoning_content || '').trim() || (Array.isArray(m.reasoning_details) && m.reasoning_details.length)));
-  if (typeof text === 'string' && (text.trim() || (why !== 'length' && why !== 'content_filter'))) return { text: text.trim() };
+  if (typeof text === 'string' && (text.trim() || (why !== 'length' && why !== 'content_filter'))) return { text: text.trim(), cut: why === 'length' };
   return { why: why === 'content_filter' ? 'filtered' : thought || why === 'length' ? 'thought' : 'empty', cut: why === 'length' };
 }
 // What a service said, with her key and token masked (a relay can echo the request), for 复制原文
@@ -96,15 +96,24 @@ function scrub(detail, settings){
 // with room for a real answer (max_tokens >= 400: her chat turn, the two 设置 checks, the side calls' default), and not
 // while 暂停 is on unless it is her own (extra.own: a chat turn, 测试连接). If the second ask fails too (a
 // service may refuse the bigger max_tokens), the first answer's 'thought' is what she is told, both answers in .detail.
+// extra.room: the most the second ask may have (default 2400). extra.whole: the job reads a whole answer (the memory job's
+// lines, 查手机's one JSON), so a text cut off counts too and is asked again; what the first ask wrote is kept if that fails.
+// So does a model that thought and stopped by itself with no text at all (content null, finish_reason 'stop'): for such a job
+// that is no answer, and it used to go to her as 'thought' at once, with no second ask.
 // No 'reasoning' field is sent to any service: OpenRouter's turns thinking ON for a model that has it off by default (and its budget can be
 // more than the room we give), and another service may refuse a field it does not know. So 测试连接 sends what a chat sends.
+// One exception, for a job that reads a whole answer from a DeepSeek model: DeepSeek V4 and V4.1 think by default, at high effort,
+// and no room we give is sure to be enough, so the job says reasoning_effort: 'none' (the one field DeepSeek's API and OpenRouter
+// both take for "no thinking"). A service that refuses it (400, 422) is asked again without it.
 async function callModel(settings, messages, extra={}){
   const endpoint = String(settings.endpoint || '').trim().replace(/\/+$/, ''), model = String(settings.model || '').trim();   // as saved
   if (!endpoint) throw modelError('noaddress');
+  let noThinking = !!extra.whole && /deepseek/i.test(model);
   const ask = async max => {
     let r;
-    try { r = await hostFetch(endpoint + '/chat/completions', { method:'POST', headers: headersFor(settings, true), body: JSON.stringify(Object.assign({ model, messages, stream:false, max_tokens: max }, extra.user ? { user: String(extra.user) } : {})) }); }
+    try { r = await hostFetch(endpoint + '/chat/completions', { method:'POST', headers: headersFor(settings, true), body: JSON.stringify(Object.assign({ model, messages, stream:false, max_tokens: max }, extra.user ? { user: String(extra.user) } : {}, noThinking ? { reasoning_effort: 'none' } : {})) }); }
     catch(e){ throw modelError('net', 0, scrub((e && e.message) || e, settings)); }
+    if (noThinking && (r.status === 400 || r.status === 422)) { noThinking = false; return ask(max); }
     const body = scrub(await r.text().catch(() => ''), settings);
     if (!r.ok) throw modelError(codeOf(r.status, body), r.status, `HTTP ${r.status} ${body}`);
     let j; try { j = JSON.parse(body); } catch { throw modelError('address', r.status, `HTTP ${r.status} ${body}`); }   // a web page, not a model service
@@ -114,12 +123,13 @@ async function callModel(settings, messages, extra={}){
   const max = Number(extra.max_tokens) || 600;
   let got = await ask(max);
   const held = !extra.own && typeof core.paused === 'function' && core.paused();
-  if (got.text == null && got.why === 'thought' && got.cut && max >= 400 && max < 2400 && !held){
+  const room = Number(extra.room) || 2400, short = got.text == null ? got.why === 'thought' && (got.cut || !!extra.whole) : got.cut && !!extra.whole;
+  if (short && max >= 400 && max < room && !held){
     if (core.calls && core.calls.note) core.calls.note('retry', messages, { settings })('');
     const first = got, again = '\n--- asked again with more room ---\n';
-    try { got = await ask(Math.min(2400, max * 3)); }
-    catch(e){ throw modelError('thought', 200, first.body + again + (e.detail || e.message)); }
-    if (got.text == null) throw modelError(got.why, 200, first.body + again + got.body);
+    try { got = await ask(Math.min(room, max * 3)); }
+    catch(e){ if (first.text != null) return first.text; throw modelError('thought', 200, first.body + again + (e.detail || e.message)); }
+    if (got.text == null){ if (first.text != null) return first.text; throw modelError(got.why, 200, first.body + again + got.body); }
   }
   if (got.text == null) throw modelError(got.why, 200, got.body);
   return got.text;

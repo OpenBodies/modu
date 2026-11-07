@@ -13,7 +13,10 @@ const { emit, store, msgDate, isoDay, tidyCJK, slug, saveMemoryItem, pronouns, L
 // read in parts of about 12,000 characters, oldest first, at most MEMORY_PARTS (the newest ones), each
 // part's memories saved as soon as they are found; memoryJob() and the event 'memoryjob' say how far
 // along it is ({ running, done, total, found }; null / { running:false, … } when it is over).
-const MEMORY_PART = 12000, MEMORY_PARTS = 24;
+// The answer has room for all its lines (about 16, in Chinese up to 1,500 tokens) beside a model that thinks first: its
+// thinking comes out of the same max_tokens, so the old 900 left it nothing, or half a line, and on a part of 12,000 characters
+// it can think past 6,000. Cut off, it is asked once more with MEMORY_ROOM. Room not used is not paid for.
+const MEMORY_PART = 12000, MEMORY_PARTS = 24, MEMORY_MAX = 4000, MEMORY_ROOM = 12000;
 let memJob = null;
 function memoryJob(){ return memJob && memJob.who === core.currentId ? { running: true, done: memJob.done, total: memJob.total, found: memJob.found } : null; }
 function deriveMemory(settings, opts={}){
@@ -46,6 +49,7 @@ async function deriveParts(settings, opts, job){
     const items = await deriveOne(settings, opts, use[i], msgs, i === use.length - 1, use.length > 1);
     if (core.currentId !== job.who) break;
     await keepItems(items);
+    if (!items.read && !items.none) all.unread = true;   // the page says so, never 没有新条目 (a paid answer that could not be read)
     all.push(...items); job.done = i + 1; job.found = all.length;
     if (items.length) emit('memory', store.memory);
     emit('memoryjob', memoryJob());
@@ -177,7 +181,7 @@ async function dayOnce(){
 }
 
 // the memory prompt is app/prompts/memory.txt; the same words stay here as its fallback
-core.prompts.fallback('memory', 'You write the memory of {{char}}, a companion in a chat app. {{char}} is {{pronoun_en}}. Output ONLY JSON lines, one object per line, no prose, no code fences. Each object: {"kind":"fact"|"summary","text":"...","date":"YYYY-MM-DD","confidence":"high"|"medium"|"low"}. Write every text in {{lang}}, in {{char}}\'s own voice: {{voice}}, the way {{pron}} would jot it down for {{self}}, plain and short, no commentary, no praise.{{banned}} In the chat, a line marked "{{her}}:" is the user\'s (her words and her *actions*); a line marked "{{char}}:" is {{char}}\'s own. Keep who said or did what: what {{char}} said or did is written as {{i_form}}, what the user said or did as {{you_form}}; never put one\'s words or deeds on the other. Facts: durable things worth remembering about the user or the two of them (preferences, plans, things that happened, what she told him), one per line, each with the date it came up (from the [date] in front of the line). One summary: two sentences on what the time together has been like, with "date" the first day. Skip anything already known. At most 12 lines. A fact may carry "importance": 1 to 5 (5 = would hurt to forget). Besides those, up to 4 lines {"kind":"said","key":"...","text":"..."}: a fact {{char}} stated in the chat about {{char}}\'s own life (work, home, a count, a stage), "key" a short name for it{{moving}}.{{part}}');
+core.prompts.fallback('memory', 'You write the memory of {{char}}, a companion in a chat app. {{char}} is {{pronoun_en}}. Output ONLY JSON lines, one object per line, no prose, no code fences. Each object: {"kind":"fact"|"summary","text":"...","date":"YYYY-MM-DD","confidence":"high"|"medium"|"low"}. Write every text in {{lang}}, in {{char}}\'s own voice: {{voice}}, the way {{pron}} would jot it down for {{self}}, plain and short, no commentary, no praise.{{banned}} In the chat, a line marked "{{her}}:" is the user\'s (her words and her *actions*); a line marked "{{char}}:" is {{char}}\'s own. Keep who said or did what: what {{char}} said or did is written as {{i_form}}, what the user said or did as {{you_form}}; never put one\'s words or deeds on the other. Facts: durable things worth remembering about the user or the two of them (preferences, plans, things that happened, what she told him), taken from what she said or did and what happened between them, never a line of {{char}}\'s own copied as a fact, one per line, each with the date it came up (from the [date] in front of the line). One summary: two sentences on what the time together has been like, with "date" the first day. Skip anything already known. At most 12 lines. A fact may carry "importance": 1 to 5 (5 = would hurt to forget). Besides those, up to 4 lines {"kind":"said","key":"...","text":"..."}: a fact {{char}} stated in the chat about {{char}}\'s own life (work, home, a count, a stage) that will still be true next week, never a moment (where {{pron}} is tonight, what {{pron}} is doing now or just did), "key" a short name for it{{moving}}.{{part}}');
 async function deriveOne(settings, opts, hist, msgs, lastPart, parted){
   const her = herLabel();
   // the memories are in the language they talk in, per companion: an English chat gets English
@@ -198,9 +202,9 @@ async function deriveOne(settings, opts, hist, msgs, lastPart, parted){
   ];
   // 整理 is her own tap (noted for 用量); the import's job goes through the one door for calls she did not make
   let text;
-  if (opts.side) text = String(await core.sideCall('memory', prompt, { chat: opts.chat !== false, max: 1200 }) || '');
+  if (opts.side) text = String(await core.sideCall('memory', prompt, { chat: opts.chat !== false, max: MEMORY_MAX, room: MEMORY_ROOM, whole: true }) || '');
   else { const heard = core.calls ? core.calls.note('memory', prompt, { settings }) : (x => x);   // counted for the cost meter (设置 → 用量)
-    text = heard(await callModel(settings, prompt, { max_tokens: 900, own: true })); }   // 整理 is her own tap
+    text = heard(await callModel(settings, prompt, { max_tokens: MEMORY_MAX, room: MEMORY_ROOM, whole: true, own: true })); }   // 整理 is her own tap
   const dates = msgs.map(msgDate).filter(Boolean);
   const first = isoDay(dates.length ? new Date(Math.min(...dates)) : new Date()), last = isoDay(dates.length ? new Date(Math.max(...dates)) : new Date());
   const items = [], saidFacts = items.said = [];   // said: the facts he stated, kept beside the items
@@ -213,7 +217,9 @@ async function deriveOne(settings, opts, hist, msgs, lastPart, parted){
     try {
       const o = JSON.parse(t); if (!o || !o.text) continue;
       items.read = true;
-      if (o.kind === 'said'){ if (o.key) saidFacts.push({ key: String(o.key), text: tidyCJK(String(o.text).trim()) }); continue; }   // a fact he has said
+      // a fact he has said, never a moment (今晚在家, 刚到家): kept as "where things stand", with no end, it stood
+      // days later. A said fact is the kind that stays true (work, home, a count); a moment has passed by the next prompt
+      if (o.kind === 'said'){ if (o.key && !core.MOMENT.test(String(o.text))) saidFacts.push({ key: String(o.key), text: tidyCJK(String(o.text).trim()) }); continue; }
       const kind = o.kind === 'summary' ? 'summary' : 'fact';
       const date = /^\d{4}-\d{2}-\d{2}$/.test(o.date || '') ? o.date : (kind === 'summary' ? first : last);
       if (kind === 'summary' && ((parted && !lastPart) || opts.factsOnly)) continue;

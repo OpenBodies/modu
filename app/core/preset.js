@@ -42,8 +42,9 @@ const moduDefaults = {
 // order: [{ identifier, enabled }] }] (the global order is character_id 100001; else the longest). A marker (chat
 // history, the card's fields, 世界书 placement) has no text of its own: Modu fills those places itself. Blocks after the
 // chat-history marker are hers to come after the chat. Sampling (temperature, top_p, …) is never applied: it is kept
-// as suggestions only (her model settings decide). → { name, blocks: [{ id, name, role, text, on, after }], sampling,
-// markers } or null for something that is not a preset.
+// as suggestions only (her model settings decide). A block may carry `modu_when`, the name of a chat signal (chatSignals,
+// context.js): it then goes in only on the turns that signal is up, so a habit's words live in the preset, swappable with it.
+// → { name, blocks: [{ id, name, role, text, on, after, when? }], sampling, markers } or null for something that is not a preset.
 const SAMPLING = ['temperature', 'top_p', 'top_k', 'top_a', 'min_p', 'frequency_penalty', 'presence_penalty', 'repetition_penalty', 'openai_max_tokens', 'openai_max_context', 'max_tokens', 'seed'];
 function parsePreset(j){
   if (!j || typeof j !== 'object' || !Array.isArray(j.prompts)) return null;
@@ -57,7 +58,7 @@ function parsePreset(j){
     if (s.id === 'chatHistory'){ after = true; markers.push(s.id); continue; }
     const text = typeof p.content === 'string' ? p.content.trim() : '';
     if (p.marker || !text){ markers.push(s.id); continue; }
-    blocks.push({ id: s.id, name: String(p.name || s.id), role: p.role === 'user' || p.role === 'assistant' ? p.role : 'system', text, on: s.on && p.enabled !== false, after });
+    blocks.push(Object.assign({ id: s.id, name: String(p.name || s.id), role: p.role === 'user' || p.role === 'assistant' ? p.role : 'system', text, on: s.on && p.enabled !== false, after }, p.modu_when ? { when: String(p.modu_when) } : {}));
   }
   const sampling = {}; for (const k of SAMPLING) if (j[k] != null && typeof j[k] !== 'object') sampling[k] = j[k];
   return { name: String(j.name || j.preset_name || ''), blocks, sampling, markers };

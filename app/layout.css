@@ -362,6 +362,9 @@ input,textarea,select{font:inherit;font-size:max(16px,1em);color:inherit}
 .src span[aria-pressed="true"]{color:var(--m-fg);border-color:var(--m-accent)}
 .note{font-size:13px;color:var(--m-muted);text-align:center}
 .note.err{color:var(--m-fg)}
+.diag{font-size:12px;color:var(--m-muted);text-align:center;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}
+.diag span{display:block;margin:6px 0}
+.diag .link{margin:0 auto}
 .contact{background:var(--m-ta);color:var(--m-ta-fg);border-radius:var(--m-radius);padding:14px;display:flex;gap:12px;align-items:center}
 .contact .av{width:50px;height:50px}
 .contact b{display:block;font-size:17px;font-family:var(--m-display);color:var(--m-fg)}
@@ -574,6 +577,7 @@ input,textarea,select{font:inherit;font-size:max(16px,1em);color:inherit}
 /* 正在整理… at the top of 记忆 while the core works, with how far along it is */
 .mcard.mjob{display:flex;flex-direction:column;gap:6px;cursor:default}
 .mcard.mjob b{font-weight:600}
+.mcard.mfail{margin-bottom:10px}.mcard.mfail .opt.why{padding:0;border:0;color:inherit}.mcard.mfail .btn2{padding:6px 0 0;text-align:left;font-size:13px;color:var(--m-muted)}
 .mcard.mjob small{margin:0}
 .mjob-bar{position:relative;height:4px;border-radius:999px;background:var(--m-line);overflow:hidden}
 .mjob-bar i{position:absolute;left:0;top:0;bottom:0;width:40%;border-radius:999px;background:var(--m-accent);animation:mjob-run 1.2s ease-in-out infinite}

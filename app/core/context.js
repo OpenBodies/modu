@@ -4,7 +4,7 @@
 (function(core){
 'use strict';
 const { store, fit, clip, msgDate, isoDay, band, clockIn, gapWords, now, cardLore, loreEntries, loreSelect, loreWhen, lunarDate, solarTerm, EMOTIONS, splitBubbles,
-  chatStops, pronouns, lifeKey, lifeLines, eventLines, knownLines, personaState, activityLines, chatCardKind } = core;
+  chatStops, dropNames, pronouns, lifeKey, lifeLines, eventLines, knownLines, personaState, activityLines, chatCardKind } = core;
 
 const EMOTION_RULE = `After your reply, on its own last line, write how you feel as exactly one tag: [emotion: X], where X is one of ${EMOTIONS.join(', ')}. The app reads the tag and shows it as a sticker; the user never sees the tag itself.`;
 // Optional reply tags, asked for only when the caller wants them (assemble / send opts).
@@ -50,6 +50,13 @@ const PROMISE_RULE = `When you tell her you will do something for her later (wak
 const BUBBLE_RULE = `Write like texting on a phone: each message on its own line. Let the length follow the moment, the way a person texts: often one short line, sometimes just a word or two, sometimes two to four lines, now and then a longer message when there is something to tell. Not every reply needs an action, a question or a strong feeling. In Chinese, leave off the 。 at the end of each message, the way people text (keep ？！… and the punctuation inside a message).`;
 // What his last replies looked like, said back to him when they fall into a pattern; and the
 // reminders he gave in his last few replies, so he does not give the same one again.
+// these notes say what the pattern is, never his lines again. Quoted ("do not
+// remind her again: 「…」"), his own words were back in his prompt every turn and the same reminder kept coming (Haiku
+// persona runs: the same reminder in 6 of the last 7 replies while it was listed). A model told to leave out a named thing tends to bring
+// it up (the "pink elephant" problem, Castricato et al. 2024, arXiv 2402.07896), and the more often a line is in the context,
+// the likelier it comes again (Xu et al. 2022). Same rule as the day block: point at it, never quote it back.
+// A last line that hands the turn back to her: a question, or advice / an instruction to her (去吧, 别…, 先…, 记得…, 早点…)
+const HANDBACK = /[？?]\s*$|^(去吧|快去|先去|你先|你去|你慢慢|慢慢来|先(?![前后])|不要|记得|早点|早些|多(喝|穿|吃|睡|休息)|少(喝|吃|熬)|赶紧|该)|^你.{0,8}(再|先|就|去)|(?<![特区分告识级派])别(?![人的])|别忘|告诉我|跟我说|发我/;
 const REMINDER = /记得|别忘|不要忘|早点|早些|多喝|多穿|多吃|别熬|少熬|熬夜|注意|小心|按时|带伞|带上|别太累|好好休息|早睡|吃饭|喝水|remember to|don't forget|get some sleep/i;
 // A video call (the page's 视频通话): he is seen and heard, not texting.
 const CALL_RULE = `You are on a video call with her right now. You can see each other; her camera may be off, and what she says reaches you as her words. Answer the way you would speak on a call: short, spoken, no *actions* about looking at a phone, no describing the call itself. Never say that there is only text, or that you can't see or hear her because this is text.`;
@@ -61,6 +68,15 @@ function awayWords(ctx){
   const how = aw.strength >= 0.67 ? 'clearly' : aw.strength >= 0.34 ? 'a little' : 'only faintly';
   return `She was away ${aw.gap} days; you are still ${aw.mood} from it (day ${aw.day} since she came back): let it show ${how} in this reply, without blaming her.`;
 }
+const lastLine = m => { const ls = splitBubbles(String(m.mes).replace(/\*[^*\n]*\*/g, ' ')).map(l => l.trim()).filter(Boolean); return ls[ls.length - 1] || ''; };
+// what the chat itself shows this turn, for a preset block's `modu_when`. The core only names the signal; the words are the preset's.
+// handed_back: one of his last two replies ended on her (a question, advice, a reminder). Modu's default preset does not use it:
+// its ending line goes in on every turn. The signal stays for a preset that wants a line only after he has done it.
+function chatSignals(msgs){
+  const his = (msgs || []).filter(m => !m.is_user && !m.is_system && m.mes).slice(-2);
+  return { handed_back: his.some(m => HANDBACK.test(lastLine(m))) };
+}
+const signalled = (b, ctx) => !b.when || !!chatSignals(ctx.allMsgs)[b.when];
 function shapeNotes(msgs, opts){
   const his = msgs.filter(m => !m.is_user && m.mes).slice(-5), last3 = his.slice(-3), notes = [];
   if (last3.length === 3){
@@ -75,12 +91,12 @@ function shapeNotes(msgs, opts){
   }
   const said = [];
   for (const m of his) for (const l of splitBubbles(m.mes)) if (REMINDER.test(l) && !said.includes(l)) said.push(l);
-  if (said.length) notes.push(`You already reminded her of these in your last few replies; do not remind her of the same thing again now: ` + said.slice(-3).map(l => '「' + clip(l, 30) + '」').join(' '));
+  if (said.length) notes.push(`You already reminded her of things in your last few replies (${said.length > 1 ? said.length + ' times' : 'once'}); no reminder or advice this time, not even in other words.`);
   const again = echoes(msgs);
   // what he already told her on this in the last few days, so he does not say it again word for word
   const before = saidBefore(msgs);
-  if (before.length) notes.push(`Already said to her lately on this, never again word for word: ${before.map(l => '「' + l + '」').join(' ')}.`);
-  if (again.length) notes.push(`These keep coming back in your recent replies: ${again.map(p => '「' + p + '」').join(' ')}. Leave them out this time unless she brings them up; do not bring up the same shared moments again as proof that you remember (pet names and your usual way of talking are fine).`);
+  if (before.length) notes.push(`You already told her about this in the last few days (it is in the chat above): add something new, or keep it short; never the same words again.`);
+  if (again.length) notes.push(`${again.length > 1 ? 'Some things' : 'One thing'} you said keep${again.length > 1 ? '' : 's'} coming back in your recent replies: this time talk about something else, or about what she just said; do not bring up the same shared moments again as proof that you remember (pet names and your usual way of talking are fine).`);
   return notes.length ? 'About this reply: ' + notes.join(' ') : '';
 }
 // his own lines from the last SAID_DAYS days (not his last two replies) that touch what her latest message is
@@ -210,7 +226,7 @@ const BLOCK_DEFAULTS = [
   { id:'preset', priority: 58, budget: 3000, mandatory:false, build: ctx => {
       // the preset layer, below Modu's base rules: a preset beside the card, the card's own, or
       // Modu's default; its text blocks that are on, in her order (the ones after the chat go after the history)
-      const P = core.presetLayer ? core.presetLayer() : null, blocks = P && P.preset ? P.preset.blocks.filter(b => b.on && !b.after) : [];
+      const P = core.presetLayer ? core.presetLayer() : null, blocks = P && P.preset ? P.preset.blocks.filter(b => b.on && !b.after && signalled(b, ctx)) : [];
       ctx.note.preset = { source: P ? P.source : 'default', name: P ? P.name : '', blocks: blocks.length };
       return blocks.length ? clip(blocks.map(b => fillNames(b.text, ctx)).join('\n'), ctx.budget) : '';
     } },
@@ -328,7 +344,7 @@ const BLOCK_DEFAULTS = [
       for (let i = src.length - 1; i >= 0; i--){
         const m = src[i], l = String(m.mes || '').length;
         if (out.length >= 2 && size + l > ctx.budget) break;   // the last two always go, even if long
-        let content = m.is_user || ctx.opts.bubbles === false ? m.mes : chatStops(m.mes);
+        let content = m.is_user || ctx.opts.bubbles === false ? m.mes : chatStops(dropNames(m.mes, store.name));   // a head left in his past lines would teach it back
         // prompt-side regex (the card folder's, the card's own, else Modu's default) on what is sent; the
         // stored chat never changes
         if (core.regex) content = core.regex.prompt(content, { who: m.is_user ? 'her' : 'him', depth: src.length - 1 - i });
@@ -439,7 +455,7 @@ function buildContext(opts = {}){
   const messages = [{ role:'system', content: head.join('\n\n') }].concat(hist);
   if (card.post_history_instructions && ids.includes('card')) messages.push({ role:'system', content: card.post_history_instructions.replace(/\{\{char\}\}/gi, name).replace(/\{\{user\}\}/gi, user) });
   // the preset's blocks placed after the chat history (her order), after the card's post-history line
-  if (ids.includes('preset') && core.presetLayer){ const P = core.presetLayer(), after = P && P.preset ? P.preset.blocks.filter(b => b.on && b.after) : []; if (after.length) messages.push({ role:'system', content: after.map(b => fillNames(b.text, ctx)).join('\n') }); }
+  if (ids.includes('preset') && core.presetLayer){ const P = core.presetLayer(), after = P && P.preset ? P.preset.blocks.filter(b => b.on && b.after && signalled(b, ctx)) : []; if (after.length) messages.push({ role:'system', content: after.map(b => fillNames(b.text, ctx)).join('\n') }); }
   const closing = tailIds.map(id => out.get(id)).filter(Boolean).join('\n');
   if (closing) messages.push({ role:'system', content: closing });
   // some services fold the system messages after her latest message into her turn, and he then took the app's
@@ -451,6 +467,6 @@ function buildContext(opts = {}){
 }
 function assemble(opts={}){ return buildContext(opts).messages; }
 
-Object.assign(core, { LANG_NAME, chatLanguage, herPronouns, CONTEXT_BUDGET, modelTuning, contextBlocks, setContextBlock,
+Object.assign(core, { chatSignals, LANG_NAME, chatLanguage, herPronouns, CONTEXT_BUDGET, modelTuning, contextBlocks, setContextBlock,
   resetContextBlocks, buildContext, assemble });
 })(globalThis[Symbol.for('modu.core')]);

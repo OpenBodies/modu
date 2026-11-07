@@ -135,23 +135,32 @@ async function generate(ctx){
     const asked = built.messages.concat([{ role:'system', content: ASK(core.store.name, familyIn(cardText()), isoOf(core.now()), chatLang(core)) }]);
     const heard = core.calls && core.calls.note ? core.calls.note('peek', asked, { settings }) : (x => x);   // counted for the cost meter
     // a call that never answers ends (else 查手机 stays on its wait line for ever)
-    raw = heard(await Promise.race([core.callModel(settings, asked, { max_tokens: 1500 }), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), TIMEOUT))]));
-  } catch(e){ ctx.toast(ctx.T('app.peek.toast.fail')); return null; }
+    // room for a model that thinks first: its thinking comes out of the same max_tokens, and half a JSON is no answer
+    raw = heard(await Promise.race([core.callModel(settings, asked, { max_tokens: 2400, room: 6000, whole: true }), new Promise((_, no) => setTimeout(() => no(Object.assign(new Error('timeout'), { code: 'timeout' })), TIMEOUT))]));
+  } catch(e){ missWhy = lookWhy(e, settings, ctx.T); ctx.toast(ctx.T('app.peek.toast.fail')); return null; }
   finally { core.setPhase('idle'); }
   const r = readPhone(raw);
-  if (!r) { ctx.toast(ctx.T('app.peek.toast.fail')); return null; }
+  if (!r) { missWhy = ctx.T('peek.contacts.why.unreadable'); ctx.toast(ctx.T('app.peek.toast.fail')); return null; }
   return core.records.put(TYPE, { phone: r.phone, dropped: r.dropped, others: r.others, trial: true }, { app: ID });
 }
 async function latest(){ const l = await M().records.list(TYPE); return l.length ? l[l.length - 1] : null; }
 // One look at a time, kept outside the screen: leaving 查手机 and coming back finds it still unlocking
 // (and the same one, never a second model call); it ends for the companion it was started for.
 // missed: whether the last look did not open, so 再看看 can say so where she looks (a toast alone is easy to miss)
-let job = null, missed = false;
-const TIMEOUT = 90000;
+let job = null, missed = false, missWhy = '';
+const TIMEOUT = 120000;
+// why this look did not open, in her words: 再试一次 cannot help with no key, so she is told what can
+function lookWhy(e, settings, T){
+  if (e && e.code === 'timeout') return T('app.peek.why.timeout');
+  const noKey = !String((settings && (settings.provider === 'local' ? settings.token : settings.key)) || '').trim();
+  // a fresh phone is set to 本机 with no key, so nothing filled in fails as "cannot connect", not as a refused key
+  if (e && (e.code === 'noaddress' || (noKey && (e.code === 'key' || e.code === 'net')))) return T('app.peek.why.nokey');
+  return failWhy(e, T);
+}
 function start(ctx){
   if (job) return job.p;
   const who = M().currentId;
-  missed = false;
+  missed = false; missWhy = '';
   const p = generate(ctx).then(r => { missed = !r; return r; }, e => { missed = true; throw e; }).finally(() => { if (job && job.p === p) job = null; });
   job = { p, who };
   return p;
@@ -420,7 +429,7 @@ function filler(k, p, busy, T, now, said){
   let list = ((p && p.phone && p.phone[k]) || []).filter(it => inChatLang(k === 'chats' ? it.last : it.text, lang));
   if (k === 'notes' && now) list = notesNow(list, p && p.date, now, said);   // his notes for a day that has passed, or that he said he did
   return (list.length ? `<div class="group">${list.map(it => item(it.text, it.inner, T, k, it.done)).join('')}</div>` : '') +
-    (missed ? `<div class="foot a-peek-missed">${esc(T('app.peek.toast.fail'))}</div>` : '') + `<button class="btn2" id="pGo">${esc(T('app.peek.again'))}</button>`;
+    (missed ? `<div class="foot a-peek-missed">${esc(T('app.peek.toast.fail'))}${missWhy ? ' ' + esc(missWhy) : ''}</div>` : '') + `<button class="btn2" id="pGo">${esc(T('app.peek.again'))}</button>`;
 }
 const VIEW = {
   // his 微信: she is the contact. Her chat is the real one; the others only if the filler was made already
@@ -659,7 +668,7 @@ ModuApps.register({
     // keeping the page she swiped to and how far down it she is. The clock and the time of her message are set in
     // place on each beat (a-peek-live), so they are left out of the comparison: the rebuild swaps only on a real
     // change, and never while she is swiping between the pages
-    let shown = '', again = 0, swiped = 0;
+    let shown = '', again = 0, swiped = 0, y0 = null;
     const still = html => String(html).replace(/(<[^>]*\ba-peek-live\b[^>]*>)[^<]*/g, '$1');
     async function restate(){
       if (view !== 'lock' && view !== 'home') return;
@@ -748,6 +757,19 @@ ModuApps.register({
     };
     // the widgets that are not buttons (his day, his 备忘录) open with Enter or Space too
     el.onkeydown = e => { const w = (e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('[data-his-to], [data-his-open]'); if (w) { e.preventDefault(); w.click(); } };
+    // a swipe up opens his lock screen, as it opens hers: as soon as the finger has gone far enough, not when it lifts (a browser
+    // may take the gesture and never say the finger lifted). The tap stays with el.onclick. Listening on el, not on the lock,
+    // because restate redraws it; `swiped` holds restate off while the finger is down, as a touch on a replaced node goes unheard.
+    const down = (e, y) => { y0 = view === 'lock' && e.target.closest && e.target.closest('[data-his-open]') ? y : null; if (y0 !== null) swiped = Date.now(); };
+    const moved = y => { if (y0 === null) return; swiped = Date.now(); if (y0 - y > 40) { y0 = null; set('home'); draw(); } };
+    const lift = () => { y0 = null; };
+    const swipe = [
+      ['pointerdown', e => down(e, e.clientY)], ['pointermove', e => moved(e.clientY)], ['pointerup', lift],
+      ['touchstart', e => down(e, e.touches[0].clientY), { passive: true }],
+      ['touchmove', e => { if (y0 !== null && e.cancelable) e.preventDefault(); moved(e.touches[0].clientY); }, { passive: false }],
+      ['touchend', lift], ['touchcancel', lift],
+    ];
+    for (const [t, f, o] of swipe) el.addEventListener(t, f, o);
     peeked('lock');
     draw().catch(e => console.error(e));
     // another person: his lock screen; a record changed (the filler arrived): the app she is in, read again in place
@@ -760,7 +782,7 @@ ModuApps.register({
     // the time on his lock and home screens moves with the one clock; on each beat they are also made again (restate)
     const offClock = M().clock && typeof M().clock.on === 'function' ? M().clock.on(() => { if (alive) { for (const x of el.querySelectorAll('.a-peek-clock, .a-peek-lk .lk-time')) x.textContent = hm(ro.now()); for (const x of el.querySelectorAll('.a-peek-live[data-at]')) if (x.dataset.at) x.textContent = when(T, Number(x.dataset.at), +ro.now()); soon(); } }) : null;
     const watch = setInterval(() => { if (alive && !running() && el.querySelector('.a-peek-wait:not(.a-peek-pcwait)')) draw(); }, 250);
-    return () => { alive = false; seq++; off(); if (typeof offClock === 'function') offClock(); clearTimeout(again); bare(false); clearInterval(watch); el.onclick = null; el.onkeydown = null; if (unview) { try { unview(); } catch {} unview = null; } };
+    return () => { alive = false; seq++; off(); for (const [t, f, o] of swipe) el.removeEventListener(t, f, o); if (typeof offClock === 'function') offClock(); clearTimeout(again); bare(false); clearInterval(watch); el.onclick = null; el.onkeydown = null; if (unview) { try { unview(); } catch {} unview = null; } };
   },
   api: { generate, start, running, latest, readPhone, guard, mentionsHer, people, familyIn, roCore, hisApps: () => hisApps().map(h => h.id),
     statusLine, todayNotes, nowNote, saidDone, hisLinesSince, contactsNow, makeContacts, keepContacts, readPeople, noteDay, notesNow, aboutHer },

@@ -4,7 +4,7 @@
 (function(core){
 'use strict';
 const { emit, store, hostFetch, markUntimely, now, writeFile, readText, readBlob, VDir, readMemory, slug, memoryBody, MEMORY_FORMAT,
-  parseChat, stageImport, storageError, kvGet } = core;
+  parseChat, stageImport, storageError, readError, readKept, kvGet } = core;
 
 // The store folder's files.
 function buildStoreFiles(st){
@@ -41,28 +41,31 @@ function folderName(s){
   return /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/i.test(n) ? '_' + n : n;
 }
 // A save is never half there. A folder being saved holds SAVING ({ v, writer, state, at });
-// in the in-browser folder every file goes in ONE write (VDir.writeFolder), state 'saved', so a closed tab leaves all
-// of him or nothing; in a real folder (and a host's storage that cannot write many at once) it says 'saving' first,
-// then every file, then 'saved'. loadFromDir takes the note away once he is in her contacts. At boot, loadContacts
+// in the in-browser folder a small companion goes in ONE write (VDir.writeFolder), state 'saved', so a closed tab leaves
+// all of him or nothing; a big one goes there in pieces, and in a real folder (and a host's storage that cannot write many
+// at once) file by file: it says 'saving' first, then the files, then 'saved'. loadFromDir takes the note away once he is in her contacts. At boot, loadContacts
 // gives back a 'saved' folder that never reached her contacts and clears a 'saving' one (recoverSaves, contacts.js);
 // in a real folder the next save of that name clears it (freeName), and 打开已有的文件夹 says it was not finished.
 const SAVING = '.modu-saving.json';
-async function savingNote(dir){
-  const t = await readText(dir, SAVING); if (t === null) return null;
+async function savingNote(dir, read = readText){
+  const t = await read(dir, SAVING); if (t === null) return null;
   try { const j = JSON.parse(t); if (j && typeof j === 'object') return j; } catch {}
   return { state:'saving' };   // cut short while it was written: not finished
 }
 async function writeFolder(root, name, files){
   const note = state => JSON.stringify({ v: 1, writer: 'modu', state, at: now().getTime() });
   let one = null;
-  // a one-transaction save the browser aborts for any reason but a full phone (WebKit and a very big companion)
-  // goes again file by file, between the save notes: slower, still put right after a closed tab
-  try { one = root.writeFolder ? await root.writeFolder(name, Object.assign({ [SAVING]: note('saved') }, files)) : null; }
+  // a save the browser keeps aborting (tried again already) for any reason but a full phone goes again file by file,
+  // between the save notes: slower, still put right after a closed tab, and it names the file that would not go in
+  try { one = root.writeFolder ? await root.writeFolder(name, Object.assign({ [SAVING]: note('saved') }, files), { saving: { file: SAVING, text: note('saving') } }) : null; }
   catch(e){ if (storageError(e).code === 'storage-full') throw e; console.error('one write refused, file by file:', e); await dropFolder(root, name); }
   if (one) return one;
   const dir = await root.getDirectoryHandle(name, { create:true });
   await writeFile(dir, SAVING, note('saving'));
-  for (const [p, c] of Object.entries(files)) await writeFile(dir, p, c);
+  for (const [p, c] of Object.entries(files)){
+    try { await writeFile(dir, p, c); }
+    catch(e){ try { e.file = p; e.size = new Blob([c]).size; } catch {} throw e; }
+  }
   await writeFile(dir, SAVING, note('saved'));
   return dir;
 }
@@ -112,16 +115,17 @@ async function saveInto(st, root, locked){
     const name = await freeName(root, folderName(st.name));
     let dir;
     try { dir = await writeFolder(root, name, files); }
-    catch(e){ await dropFolder(root, name); throw storageError(e); }
+    catch(e){ await dropFolder(root, name); throw storageError(e, 'write'); }
     stayed = !was || !wasName || (core.currentId === was && store.name === wasName);   // nobody was open: he opens
     // what we just wrote cannot be read back (another tab's start removed it, on a phone with no Web Locks):
     // the save was cut off, said as that (never "no companion in this folder"), and what is left of it goes
     try { if (stayed) await loadFromDir(dir); else await listOnly(dir, st); }
-    catch(e){ await dropFolder(root, name); throw storageError(Object.assign(new DOMException('the folder was taken away while it was saved', 'AbortError'), { cause: e })); }
+    catch(e){ await dropFolder(root, name); throw storageError(Object.assign(new DOMException('the folder was taken away while it was saved', 'AbortError'), { cause: e }), 'read-back'); }
     return dir;
   });
   // her own companion in the in-browser folder: ask the browser to keep it (Safari's 7 days, Android's clean-up)
-  if (dir instanceof VDir && !st.seeded && !st.sample) keepStorage().then(persisted => emit('storage', { persisted }), () => {});
+  if (dir instanceof VDir && core.storage().kind === 'memory') emit('storage', { persisted: false, where: 'memory' });
+  else if (dir instanceof VDir && !st.seeded && !st.sample) keepStorage().then(persisted => emit('storage', { persisted }), () => {});
   if (stayed) await queueImported(st);   // the memory job works on the open companion: not when she is with someone else
   return dir;
 }
@@ -197,18 +201,22 @@ function resetStore(){
   core.folderData = null;
   Object.assign(store, { dir:null, name:'', card:null, cardSource:null, meta:{}, msgs:[], memory:[], writable:false, avatarURL:'', source:'', folderName:'', importedAt:0, seeded:false, pronounNote:null, cardFolder:null, params:null });
 }
-// Everything is read and checked first; the open companion is left as he was until then.
+// Everything is read and checked first; the open companion is left as he was until then. A file that is there and would
+// not read stops it (err.code 'storage-read'): he never opens as a name with no card, answering as a bare model.
 async function loadFromDir(dir){
-  const note = await savingNote(dir);
+  let note, cardJ, chatRaw, man;
+  try { note = await savingNote(dir, readKept); cardJ = await readKept(dir, 'card.json'); chatRaw = await readKept(dir, 'chat.jsonl'); man = await readKept(dir, 'manifest.json'); }
+  catch(e){ throw readError(e); }
   if (note && note.state !== 'saved') throw Object.assign(new Error('这个文件夹没有搬完（上次被打断了），请重新搬家'), { code: 'unfinished' });
   // an empty chat.jsonl counts as no file
-  const cardJ = await readText(dir, 'card.json'), chatRaw = await readText(dir, 'chat.jsonl'), chatT = chatRaw && chatRaw.trim() ? chatRaw : null;
-  if (!cardJ && !chatT) throw new Error('这个文件夹里没有角色');
+  const chatT = chatRaw && chatRaw.trim() ? chatRaw : null;
+  if (!cardJ && !chatT) throw Object.assign(new Error('这个文件夹里没有角色'), { code: 'no-companion' });
   let cj = null;
   if (cardJ){ try { cj = JSON.parse(cardJ); } catch {} if (!cj || typeof cj !== 'object') throw Object.assign(new Error('这个文件夹里的角色卡坏了，打不开'), { code: 'broken-card' }); }
   let c; try { c = chatT ? parseChat(chatT) : { meta:{}, msgs:[] }; } catch { throw Object.assign(new Error('这个文件夹里的聊天记录坏了，打不开'), { code: 'broken-chat' }); }
-  const man = await readText(dir, 'manifest.json');
   let mj = null; try { mj = JSON.parse(man); } catch {}
+  // his manifest says a card was saved and it is not here: a chat with nobody behind it. Refused, his chat left as it is
+  if (!cardJ && mj && Array.isArray(mj.files) && mj.files.includes('card.json')) throw Object.assign(new Error('角色卡不见了，打不开。聊天记录还在，可以从备份恢复，或者重新导入角色卡'), { code: 'card-missing' });
   // when he moved in. Imported messages dated after that moment are shown undated (a folder
   // from before imported_msgs: every message dated after now); and his move-in counts as a moment they
   // were together, so he is not 睡着了 in the middle of it.

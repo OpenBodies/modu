@@ -10,15 +10,16 @@ const { emit, store, env, msgDate, gapWords, now, kvSet, kvGet, pronouns } = cor
 // the gap since they last talked. Published on the seam as {type:"persona", v:1, state} when it changes.
 const MOOD_LINGER = 2 * 3600 * 1000;
 // His day may say more than a presence word. setDayPlan's fn may return a status object
-//   { presence: 'here' | 'asleep' | 'busy' | null, where, busy, what, since, mood }
+//   { presence: 'here' | 'asleep' | 'busy' | null, where, busy, what, inChat, since, mood }
 // (where: '画室'; busy: true while he cannot really talk; what: what he is doing, in words; since: ms, when it
-// began; mood: a word from his params' moods, e.g. 'tired', or an away mood). The ONE status object stays
+// began; mood: a word from his params' moods, e.g. 'tired', or an away mood; inChat: true while `what` is his own line,
+// still in the chat his prompt reads, so the prompt does not say it twice). The ONE status object stays
 // personaState(): these become its where / busy / what / since / moodWord. A plain word still works.
 function dayStatus(t){
   if (!dayPlan) return null;
   let d = null; try { d = dayPlan(t); } catch { return null; }
   if (d && typeof d === 'object') return { presence: PRESENCE.includes(d.presence) ? d.presence : null, where: String(d.where || ''), busy: d.busy === true,
-    what: String(d.what || d.doing || ''), since: Number(d.since) || null, mood: String(d.mood || '') };
+    what: String(d.what || d.doing || ''), inChat: d.inChat === true, since: Number(d.since) || null, mood: String(d.mood || '') };
   return PRESENCE.includes(d) ? { presence: d, where: '', busy: d === 'busy', what: '', since: null, mood: '' } : null;
 }
 function personaState(){
@@ -38,7 +39,8 @@ function personaState(){
     `${name} is ${pw === 'asleep' ? 'asleep, or was until she wrote' : pw === 'busy' ? 'busy with his own things, and sees her message in a spare moment' : 'awake and free'}` +
     (mood !== 'neutral' ? `; the ${mood} from earlier has not quite gone (${gapWords(age)})` : '') + '.';
   const where = st ? st.where : '', what = st ? st.what : '', moodWord = st ? st.mood : '';
-  const more = !name || !(where || what || moodWord) ? '' : ' ' + [what ? `Right now: ${what}` : '', where ? `at ${where}` : '', moodWord ? `feeling ${moodWord}` : ''].filter(Boolean).join(', ') + '.';
+  const parts = [what && !(st && st.inChat) ? `Right now: ${what}` : '', where ? `at ${where}` : '', moodWord ? `feeling ${moodWord}` : ''].filter(Boolean);
+  const more = !name || !parts.length ? '' : ' ' + parts.join(', ') + '.';
   return { v: 1, name, presence: p, doing, mood, moodAt: ld && mood !== 'neutral' ? ld.getTime() : null, lastAt: lastAny ? lastAny.getTime() : null, gapMin: gap == null ? null : Math.round(gap / 60000), pronoun: pr, words: words + more,
     where, busy: st ? (turn ? own === 'busy' : p === 'busy') : p === 'busy' && !turn, what, since: st ? st.since : null, moodWord };   // busy as the one label says
 }

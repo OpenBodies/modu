@@ -172,6 +172,10 @@ async function deleteMemory(it){
   store.memory = store.memory.filter(m => m !== it); emit('memory', store.memory);
 }
 
-Object.assign(core, { MEMORY_FORMAT, memoryNeedsMigration, parseMemoryFile, readMemory, slug, memoryBody, saveMemoryItem, addMemory, editMemory,
+// a said fact that is a moment, not a state (今晚, 刚, 正在, now): the memory job keeps no new one, and one kept before ends
+// with its day in the current state
+const MOMENT = /今晚|今天|刚才|刚刚|刚[^好才]|正在|现在|此刻|这会儿|tonight|today|right now|just now/i;
+
+Object.assign(core, { MOMENT, MEMORY_FORMAT, memoryNeedsMigration, parseMemoryFile, readMemory, slug, memoryBody, saveMemoryItem, addMemory, editMemory,
   pinMemory, deleteMemory, datedWords });
 })(globalThis[Symbol.for('modu.core')]);

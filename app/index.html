@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- the build version's single source (设置 → 关于 shows it) -->
-<meta name="modu-version" content="v0.5.3.1">
+<meta name="modu-version" content="v0.5.4.2">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Modu 小手机</title>
 <link rel="icon" type="image/svg+xml" href="brand/modu-mark.svg">
@@ -161,7 +161,12 @@
       <button class="link" id="impNew" data-t="import.new"></button>
       <!-- the default companion could not be put here at the first start: said, with the reason (core firstRunError) -->
       <div class="note err" id="impFirst" hidden></div>
+      <button class="link" id="impFirstAgain" data-t="first.again" hidden></button>
+      <!-- this browser cannot keep what she brings (core storageCheck): said here too, for as long as it is so -->
+      <div class="note err" id="impStore" hidden></div>
       <div class="note" id="impNote"></div>
+      <!-- a save that failed: the one line she can copy to us (core saveFailure) -->
+      <div class="diag" id="impDiag" hidden><span></span><button class="link" data-t="diag.copy"></button></div>
       <!-- the c.ai app's export has many chats and no names on them: she picks the chat and who he is -->
       <div class="caipick" id="caiPick" hidden>
         <div class="gtitle" id="caiChatsT" data-t="import.caiapp.chats"></div>
@@ -1147,10 +1152,21 @@ $('lkForgot').onclick = () => sheet(`<h3>${esc(T('lock.forgot.title'))}</h3><p>$
 });
 document.addEventListener('keydown', e => { if (current !== 'lock' || $('lkCode').hidden || $('scrim').classList.contains('open')) return; if (/^\d$/.test(e.key)) keyIn(e.key); else if (e.key === 'Backspace') keyIn('del'); else if (e.key === 'Escape') showCode(false); });
 // unlock: a tap, or a swipe up; with the passcode on, the keypad comes first
+// A swipe counts as soon as the finger has gone up far enough, not when it lifts: Safari and via浏览器 can take the
+// gesture for themselves mid-way, and then the page hears pointercancel and never pointerup. Touch events are heard too (the
+// browser is told to leave the gesture alone), and the first of the two to arrive decides; y0 cleared means it is decided.
 (() => {
-  let y0 = null;
-  $('lk').addEventListener('pointerdown', e => { y0 = e.clientY; });
-  $('lk').addEventListener('pointerup', e => { if (y0 === null) return; const dy = y0 - e.clientY; y0 = null; if (dy > 40 || Math.abs(dy) < 8) { if (needCode()) showCode(true); else unlock(); } });
+  const lk = $('lk'); let y0 = null;
+  const open = () => { y0 = null; if (needCode()) showCode(true); else unlock(); };
+  const down = y => { y0 = y; };
+  const moved = y => { if (y0 !== null && y0 - y > 40) open(); };
+  const up = y => { if (y0 === null) return; const dy = y0 - y; y0 = null; if (dy > 40 || Math.abs(dy) < 8) open(); };
+  lk.addEventListener('pointerdown', e => down(e.clientY));
+  lk.addEventListener('pointermove', e => moved(e.clientY));
+  lk.addEventListener('pointerup', e => up(e.clientY));
+  lk.addEventListener('touchstart', e => down(e.touches[0].clientY), { passive: true });
+  lk.addEventListener('touchmove', e => { if (e.cancelable) e.preventDefault(); moved(e.touches[0].clientY); }, { passive: false });
+  lk.addEventListener('touchend', e => up(e.changedTouches[0].clientY));
 })();
 
 // ---------- 搬家 ----------
@@ -1239,7 +1255,29 @@ $('impBackup').onclick = () => {
   $('importFile').files = t.files; $('importFile').dispatchEvent(new Event('change'));
   staged = null; pending = []; offerBackup(null); note(''); showStaged();
 };
-function note(t, err){ $('impNote').textContent = t; $('impNote').classList.toggle('err', !!err); }
+function note(t, err){ $('impNote').textContent = t; $('impNote').classList.toggle('err', !!err); $('impDiag').hidden = true; }
+// what went wrong, as one line she can copy to us: no guess needed, and nothing of hers in it (core saveFailure)
+const failLine = e => (M.saveFailure ? M.saveFailure(e) : String(e && e.name || ''));   // a core of her own may not have it
+function copyLine(t){
+  const told = () => toast(T('diag.copied'));
+  try { navigator.clipboard.writeText(t).then(told, () => toast(T('diag.hold'))); } catch { toast(T('diag.hold')); }
+}
+$('impDiag').querySelector('button').onclick = () => copyLine($('impDiag').querySelector('span').textContent);
+function showDiag(e){ const t = failLine(e); $('impDiag').querySelector('span').textContent = t; $('impDiag').hidden = !t; }
+// a failure too long for a toast: what happened, the line to copy, and (o.remove) the way to take a dead row out
+function problem(title, text, line, o = {}){
+  (o.later ? sheetLater : sheet)(`<h3></h3><p></p>${line ? `<div class="diag"><span></span></div><button class="btn2" id="pbCopy">${esc(T('diag.copy'))}</button>` : ''}${o.remove ? `<button class="btn2" id="pbRemove">${esc(T('chats.delete'))}</button>` : ''}<button class="btn" data-close>${esc(T('ok'))}</button>`, el => {
+    el.querySelector('h3').textContent = title; el.querySelector('p').textContent = text;
+    if (line){ el.querySelector('.diag span').textContent = line; el.querySelector('#pbCopy').onclick = () => copyLine(line); }
+    if (o.remove) el.querySelector('#pbRemove').onclick = () => { closeSheet(); setTimeout(o.remove, 300); };
+  });
+}
+// his row would not open: the core's sentence and what the browser really said, never only 无法打开. Files that are gone
+// can only be taken out of the list, and only by her
+function cannotOpen(c, e){
+  const why = /[\u4e00-\u9fff]/.test(e && e.message || '') ? e.message.replace('\u8fd9\u4e2a\u6587\u4ef6\u5939', '\u8fd9\u4e2a\u8054\u7cfb\u4eba') : T('import.toast.notopened');
+  problem(T('open.fail.title', { name: c.name }), why, e && e.code !== 'files-missing' && e.code !== 'card-missing' ? failLine(e) : '', e && (e.code === 'files-missing' || e.code === 'card-missing') ? { remove: () => deleteSheet(c) } : {});
+}
 function showStaged(){
   const cai = staged && staged.caiApp;
   const has = !!(staged && (staged.card || staged.msgs.length || cai));
@@ -1454,6 +1492,11 @@ function askTwin(twin, o = {}){
     // on her computer the old one only leaves the list (his folder stays, as 删除 says); on the phone he is gone
     const onDisk = twin.where === 'folder';
     el.querySelector('p').textContent = T(onDisk ? 'import.twin.text.folder' : 'import.twin.text', { name: twin.name });
+    // which one goes: with two of that name she must see who she is agreeing to lose, as 聊天 shows him
+    const same = M.contacts.filter(c => c.name === twin.name).length, said = twin.last ? preview(twin.last).split('\n').pop() : '';
+    const who = document.createElement('p'); who.dataset.twinGoes = '';
+    who.textContent = [T(same > 1 ? 'import.twin.goes.many' : 'import.twin.goes', { n: same }), twin.lastAt ? stampText(new Date(twin.lastAt)) : '', said].filter(Boolean).join(' · ');
+    el.querySelector('p').after(who);
     el.querySelector('#twinNew').textContent = T(onDisk ? 'import.twin.replace.folder' : 'import.twin.replace');
     el.querySelector('#twinNew').onclick = () => { closeSheet(); startImport(Object.assign({}, o, { replace: twin })); };
     el.querySelector('#twinBoth').onclick = () => { closeSheet(); startImport(Object.assign({}, o, { both: true })); };
@@ -1498,7 +1541,7 @@ async function startImport(o = {}){
     if (firstBefore && firstBefore.used && firstBefore.id !== M.currentId && !(o.replace && o.replace.id === firstBefore.id)){
       const c = M.contacts.find(x => x.id === firstBefore.id); if (c) deleteSheet(c, { first: true });
     }
-  } catch(e){ if (e.name !== 'AbortError') note(T('import.error.save') + plainError(e), true); }
+  } catch(e){ if (e.name !== 'AbortError'){ note(T('import.error.save') + plainError(e), true); showDiag(e); } }
   finally { starting = false; moving(false); if (staged) showStaged(); }
 }
 $('openOld').hidden = !PICK;
@@ -1516,19 +1559,19 @@ function renderChats(){
   const add = document.createElement('button'); add.className = 'citem add'; add.id = 'addRow';
   add.innerHTML = `<div class="av"><svg class="ic"><use href="#i-plus"/></svg></div><div class="cmid"><b></b></div>`;
   add.querySelector('b').textContent = T('chats.add.row'); add.onclick = openImport; box.appendChild(add);
-  if (!M.contacts.length){ const e = document.createElement('div'); e.className = 'empty'; e.textContent = T('chats.empty'); box.appendChild(e); return; }
+  if (!M.contacts.length){ const e = document.createElement('div'); e.className = 'empty'; e.textContent = T(M.contactsUnread ? 'chats.unread' : 'chats.empty'); box.appendChild(e); return; }
   for (const c of M.contacts){
     const b = document.createElement('button'); b.className = 'citem' + (c.id === M.currentId ? ' on' : '');
     const d = c.lastAt ? new Date(c.lastAt) : null;
     b.innerHTML = `<div class="av"></div><div class="cmid"><b></b><small></small></div><small class="t"></small>`;
     b.querySelector('.av').style.backgroundImage = c.avatar ? `url("${c.avatar}")` : '';
-    b.querySelector('b').textContent = c.name; b.querySelector('.cmid small').textContent = c.last ? preview(c.last).split('\n').pop() : '';
+    b.querySelector('b').textContent = c.name; b.querySelector('.cmid small').textContent = c.filesMissing ? T('chats.missing') : c.last ? preview(c.last).split('\n').pop() : '';
     b.querySelector('.t').textContent = d ? stampText(d) : '';
     b.dataset.id = c.id;
     b.onclick = async () => {
       if (b.dataset.held) { delete b.dataset.held; return; }
       try { if (await M.openContact(c.id)) go('chat'); else toast(T('import.toast.notopened')); }
-      catch(e){ toast(T('import.toast.notopened')); }
+      catch(e){ cannotOpen(c, e); }
     };
     // a long press (or a right click) asks to delete him
     let held = null;
@@ -1542,10 +1585,37 @@ function renderChats(){
 function openImport(){ staged = null; pending = []; chosen = {}; pickOpen = false; offerBackup(null); note(''); showStaged(); if (starting) note(T('import.moving', { name: movingName })); go('import'); }
 $('addContact').onclick = openImport;
 $('nobodyGo').onclick = openImport;
-// the first start could not put the default companion here: one line on 搬家 with the reason, never silent
+// the first start could not put the default companion here: one line on 搬家 with the reason, never silent, and a way
+// to try again. The phone also tries by itself, a few times, while she is here (firstRunAgain)
 function showFirstRun(){
   const why = !M.contacts.length && M.firstRunError;
   $('impFirst').hidden = !why; $('impFirst').textContent = why ? T('import.first.fail', { why }) : '';
+  $('impFirstAgain').hidden = !why;
+}
+const FIRST_AGAIN = [3000, 15000, 60000];
+const seedFirst = () => M.firstRun('../samples/', { lang: qs.get('lang') === 'en' ? 'en' : 'zh' });
+function afterFirst(){ showFirstRun(); if (current === 'home') renderHome(); if (current === 'chats') renderChats(); }
+function firstRunAgain(n = 0){
+  if (!M.firstRunError || M.contacts.length) return;
+  if (n >= FIRST_AGAIN.length){ problem(T('first.fail.title'), M.firstRunError, M.firstRunDetail, { later: true }); return; }
+  setTimeout(async () => {
+    if (M.contacts.length) return;
+    await seedFirst(); afterFirst();
+    if (M.firstRunError) firstRunAgain(n + 1);
+  }, FIRST_AGAIN[n]);
+}
+$('impFirstAgain').onclick = async () => { await seedFirst(); afterFirst(); if (M.firstRunError) toast(M.firstRunError); };
+// this browser cannot keep what she brings: said once a visit, once she is past the lock, and on 搬家 for as long as it is
+// so. A picture-sized write that only took too long is no reason to alarm her (another tab may be saving)
+let storageTold = false;
+function storageWarn(r){
+  if (!r || r.ok || (r.small === 'ok' && r.big === 'no-answer')) return;
+  const text = T('storage.' + (r.why || 'writes'));
+  $('impStore').hidden = false; $('impStore').textContent = text;
+  if (storageTold) return; storageTold = true;
+  const line = ['出错记录', r.kind, r.small !== 'ok' ? r.small : r.big].join(' · ');
+  const tell = () => { if (current === 'lock' || !current) return setTimeout(tell, 800); problem(T('storage.title'), text, r.why === 'no-indexeddb' ? '' : line, { later: true }); };
+  tell();
 }
 // 新建一个: his name, one line about him, a greeting (optional) and a few lines of personality. core newCard makes a
 // V2 card of it, and it is staged like a card she picked (pending, restage), so 开始聊天 saves him the same way
@@ -1596,8 +1666,11 @@ function deleteSheet(c, o = {}){
 function renderHome(){
   setAvatars(); renderPresence();
   const last = lastHis();
-  $('lastLine').textContent = last ? preview(M.splitBubbles(last.mes).pop() || last.mes) : S.name ? '' : T('home.nobody.sub');
-  if (!S.name) document.querySelector('.w.him b').textContent = T('home.nobody');
+  // nobody open is not always nobody here: she may have contacts that did not open, a list that would not read, or a
+  // default companion that did not arrive
+  const empty = M.contactsUnread ? 'home.unread' : M.contacts.length ? 'home.closed' : M.firstRunError ? 'home.first.fail' : 'home.nobody';
+  $('lastLine').textContent = last ? preview(M.splitBubbles(last.mes).pop() || last.mes) : S.name ? '' : T(empty + '.sub');
+  if (!S.name) document.querySelector('.w.him b').textContent = T(empty);
   const d = last && M.msgDate(last); $('lastTime').textContent = d ? stampText(d) : '';
   const since = M.togetherSince();
   $('days').textContent = since ? T('home.days', { n: Math.floor((new Date(iso(new Date())) - new Date(iso(since))) / 864e5) + 1 }) : '';
@@ -1813,7 +1886,11 @@ function photoEl(cap){
 function shown(t, who){ if (!M.regex || !t) return t; const r = M.regex.markers(M.regex.display(t, { who })); return r.text || t; }
 const partEl = p => p.kind === 'act' ? actLine(p.text) : p.kind === 'photo' ? photoEl(p.text) : bubble(p.text, false);
 // His reply is shown as several short bubbles and action lines (core.js splitParts); history appears at once.
+// drawn: the messages on screen now. Her message joins the chat before it is saved and is announced after, so a redraw
+// during a slow save (已读 arriving, on a long chat) has drawn it already, and the announcement must not draw it again.
+let drawn = new WeakSet();
 function addMsg(m, log = $('log')){
+  drawn.add(m);
   stamp(m, log);
   const nc = neutralCard(m); if (nc) { log.appendChild(nc); return; }
   const card = appCard(m); if (card) { log.appendChild(card); return; }
@@ -1891,7 +1968,7 @@ $('log').addEventListener('scroll', () => {
 function renderChat(fresh){
   const log = $('log'), same = !fresh && chatWin.msgs === S.msgs;
   const fromEnd = same && log.clientHeight ? log.scrollHeight - log.scrollTop : null;   // a redraw puts her back where she was
-  setAvatars(); renderPresence(); log.innerHTML = '';
+  setAvatars(); renderPresence(); log.innerHTML = ''; drawn = new WeakSet();
   restoreDraft();
   if (!same) { clearTimeout(chatWin.more); Object.assign(chatWin, { msgs: S.msgs, start: Math.max(0, S.msgs.length - CHAT_WIN), armed: false, mood: [], more: 0 }); }
   chatWin.start = Math.min(chatWin.start, S.msgs.length); log.dataset.from = chatWin.start;   // the first message drawn (for checks)
@@ -1928,7 +2005,7 @@ function textChanged(){ $('sendBtn').hidden = !$('text').value.trim(); $('plusBt
 function restoreDraft(){ $('text').value = D.get('chat'); textChanged(); }
 $('text').addEventListener('input', () => { D.set('chat', $('text').value); textChanged(); });
 // Enter sends; Shift+Enter, or Enter while choosing characters (拼音), is not a send
-$('text').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); $('sendForm').requestSubmit(); } });
+$('text').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); const f = $('sendForm'); if (f.requestSubmit) f.requestSubmit(); else f.onsubmit({ preventDefault(){} }); } });
 // the phone's keyboard: the phone fits the part of the screen the keyboard leaves, so the box and
 // its send button stay in sight (visualViewport; Android also resizes by itself, interactive-widget)
 function fitViewport(){
@@ -1976,13 +2053,14 @@ async function say(text){
 }
 $('sendForm').onsubmit = e => {
   e.preventDefault();
-  const text = $('text').value.trim(); if (!text) return;
+  // while he is still answering her last one, what she typed stays in the box (say would drop it, and it would be gone)
+  const text = $('text').value.trim(); if (!text || busy) return;
   $('text').value = ''; D.clear('chat'); textChanged();
   say(text);
 };
 M.on((ev, data) => {
   if (ev === 'message' && cardKind(data)) { if (current === 'chat') { addMsg(data); $('log').scrollTop = 1e9; } return; }   // a neutral card: nobody's words
-  if (ev === 'message' && current === 'chat') { showTyping(false); if (data.is_user) { addMsg(data); $('log').scrollTop = 1e9; } else playMsg(data); }
+  if (ev === 'message' && current === 'chat') { showTyping(false); if (data.is_user) { if (!drawn.has(data)) addMsg(data); $('log').scrollTop = 1e9; } else playMsg(data); }
   if (ev === 'message' && !data.is_user) { for (const s of document.querySelectorAll('#log .sysline.unsent')) s.remove(); renderPresence(); }
   // the lock screen (and home) follow what came while she was away: the catch-up's messages arrive after the
   // screen is drawn, so it is drawn again then (his newest message as the notification), never the old one until she unlocks
@@ -1997,7 +2075,7 @@ M.on((ev, data) => {
   if (ev === 'memoryjob') { memJob = data && data.running ? data : null; if (current === 'memory') renderJob(); }
   if (ev === 'avatar') setAvatars();
   if (ev === 'bridge') renderBridge(data);
-  if (ev === 'error') toast(data);
+  if (ev === 'error'){ const at = String(data).indexOf('出错记录'); if (at < 0) toast(data); else problem(T('save.fail.title'), String(data).slice(0, at), String(data).slice(at), { later: true }); }
   if (ev === 'loaded') setAvatars();
   if (ev === 'loaded' || ev === 'pronouns') { applyWords(); renderPresence(); }   // the words follow his pronoun
   if (ev === 'contacts' && current === 'chats') renderChats();
@@ -2233,6 +2311,7 @@ function renderMemory(){
   const box = $('mem'), all = S.memory, q = $('memSearch').value.trim().toLowerCase();
   box.innerHTML = '';
   if (M.memorySource && M.memorySource.outside){ $('memTools').hidden = true; renderOutsideMemory(box); return; }
+  renderFail(box);
   renderJob();   // 正在整理…, first, while the core works
   $('memTools').hidden = all.length < MEM_TOOLS_FROM && !q;
   for (const b of document.querySelectorAll('#memTools [data-sort]')) b.classList.toggle('on', b.dataset.sort === memSort);
@@ -2320,11 +2399,28 @@ function renderJob(){
   card.classList.toggle('parts', j.total > 1);
   card.querySelector('i').style.width = j.total > 1 ? Math.max(4, Math.round(j.done / j.total * 100)) + '%' : '';
 }
+// why the last 整理 came to nothing: a toast is gone before she can read it, so this stays at the top of 记忆, with 复制原文,
+// until she closes it or taps 整理 again. Only here and only for him: nothing is saved.
+let memFail = null;
+function renderFail(box){
+  if (!memFail || memFail.who !== M.currentId) return;
+  const card = document.createElement('div'); card.className = 'mcard mfail'; card.setAttribute('role', 'alert');
+  card.innerHTML = '<div class="opt why"></div><button class="btn2" type="button"></button>';
+  showWhy(card.firstChild, memFail);
+  card.lastChild.textContent = T('ok'); card.lastChild.onclick = () => { memFail = null; card.remove(); };
+  box.prepend(card);
+}
 async function derive(){
   if (current !== 'memory') toast(T('memory.job.working'));
   if (memJob) return;   // the same job: never a second one
-  try { const items = await M.deriveMemory(settings); toast(items.length ? T('memory.toast.done', { n: items.length }) : T('memory.toast.none')); }
-  catch(e){ toast(T('memory.toast.failed') + e.message.slice(0, 30)); }
+  const fail = (text, raw) => { memFail = { who: M.currentId, text, raw: raw || text }; };
+  memFail = null; const was = document.querySelector('#mem .mfail'); if (was) was.remove();
+  try {
+    const items = await M.deriveMemory(settings);
+    if (!items.length && items.unread) fail(T('memory.toast.unread'));
+    toast(items.length ? T('memory.toast.done', { n: items.length }) : T(items.unread ? 'memory.toast.unread' : 'memory.toast.none'));
+  }
+  catch(e){ fail(T('memory.toast.failed') + errWords(e), rawOf(e, settings)); toast(T('memory.toast.failed') + e.message.slice(0, 30)); }
   finally { if (current === 'memory' && !document.querySelector('#mem textarea')) renderMemory(); }
 }
 
@@ -2849,14 +2945,17 @@ $('importFile').onchange = async e => {
     const r = await window.ModuBackup.importCompanion(f, root, M);
     toast(T('settings.import.done', { name: r.name })); go('chat');
     if (!PICK) keepNotice({ persisted: r.persisted });   // 换手机: the same once-only line as after her own import
-  } catch(err){ if (err.name !== 'AbortError') toast(T('settings.import.fail') + plainErr(err, 'settings.import.err.')); }
-  finally { restoring = false; }
+  } catch(err){
+    if (err.name === 'AbortError') return;
+    if (String(err.code).startsWith('storage-')) problem(T('save.fail.title'), T('settings.import.fail') + plainErr(err, 'settings.import.err.'), failLine(err));
+    else toast(T('settings.import.fail') + plainErr(err, 'settings.import.err.'));
+  } finally { restoring = false; }
 };
 // after she moves her own companion into this phone the core asks the browser to keep him
 // ('storage'). Not kept: said once. On an iPhone not opened from the home screen, Safari clears a site after 7 days
 // without a visit, and private browsing loses him when the tab closes. A home-screen web app has its own storage, so the
 // way to keep him is a backup carried over: 导出备份 here, then import it in the home-screen 小手机; elsewhere, a backup.
-M.on((ev, d) => { if (ev === 'storage') keepNotice(d); });
+M.on((ev, d) => { if (ev !== 'storage') return; if (d && d.where === 'memory') storageWarn({ ok: false, why: 'no-indexeddb', kind: 'memory' }); else keepNotice(d); });
 // the sheet waits for an open one (the default char's question) to close; it counts as seen only when
 // one of its own buttons is tapped (a stray tap on the backdrop does not); and with localStorage blocked (an in-app browser,
 // old private mode) it is said once per visit
@@ -2975,8 +3074,10 @@ function openAt(){
   // first gets the default companion char (samples/char_zh.png; char_en.png with ?lang=en; core firstRun). Then it opens like a phone: the lock
   // screen, then home (or the screen she was on). The last companion is opened if the browser allows it
   // without asking; otherwise 聊天 lists them (one tap lets the browser ask).
+  if (M.storageCheck) M.storageCheck().then(storageWarn);   // beside the start, never holding it up (a core of her own may not have it)
   await M.loadContacts();
-  await M.firstRun('../samples/', { lang: qs.get('lang') === 'en' ? 'en' : 'zh' });
+  await seedFirst();
+  showFirstRun(); firstRunAgain();
   const last = M.current() || M.contacts[0];
   let opened = false;
   // a folder that will not open is said in plain words (the core's sentence), never a blank phone

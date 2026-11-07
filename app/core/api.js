@@ -12,11 +12,11 @@ const { NEUTRAL_DEFAULTS, MODU_DEFAULTS, setDefaults, getDefaults, listeners, st
   restoreMyStore, herProfile, loadHerProfile, setHerProfile, userName, herPronouns, refreshLife, logEvent, eventList, noticeRules, chatCardKind, addChatCard, sessionList, beginSession,
   holdSession, endSession, turn, shareWith, knownList, personaState, bridge, bridgeConnect,
   publish, setPhase, PRESENCE, setDayPlan, presence, updatePresence, wakeAt, setPresence, setBodyModel, bodyModel, chatLanguage,
-  modelTuning, contextBlocks, setContextBlock, resetContextBlocks, buildContext, assemble, callModel,
+  modelTuning, contextBlocks, setContextBlock, resetContextBlocks, buildContext, chatSignals, assemble, callModel,
   testConnection, checkCardArrived, listModels, normEndpoint, serviceOf, MODEL_SERVICES, memoryJob, deriveMemory, importMemory, dayMemory, calendarDays, awayTold, send, togetherSince, localModelAddress,
   DEFAULT_SETTINGS, loadSettings, saveSettings, CORE_VERSION, setEnv, param, params, state, jobs, bell, day, memorySource,
   prompt, prompts, layers, regex, chapters, calibrate, exportCard, answerPronoun, unusedParts, guessPronoun, parsePreset, presetLayer,
-  moduDefaults, loreSelect, currentState, lunarDate, solarTerm, ticker, reach, sideCall, calls, sideSettings, useSettings, loadReach, saveReach, paused } = core;
+  moduDefaults, loreSelect, currentState, lunarDate, solarTerm, ticker, reach, sideCall, calls, sideSettings, useSettings, loadReach, saveReach, paused, lead } = core;
 
 // window.ModuCore in a page; the global of a worker or a Node realm
 globalThis.ModuCore = {
@@ -38,6 +38,10 @@ globalThis.ModuCore = {
   // first run; the default companion once she moves her own in
   firstRun, greetingFor, firstCompanion,
   get firstRunError(){ return core.firstRunError || ''; },   // why the last firstRun failed ('' when it did not)
+  get firstRunDetail(){ return core.firstRunDetail || ''; },   // that failure as the line to copy (saveFailure)
+  // can this browser keep anything, and the one line to copy for a failed save (any error)
+  storageCheck: core.storageCheck, saveFailure: core.saveFailure,
+  get contactsUnread(){ return core.isUnread(); },   // her list could not be read: "nobody here" would be wrong
   // records (store 0.2): one folder per record type
   records,
   // her phone: her own store beside his folders, the same record API; and how he may know
@@ -53,7 +57,7 @@ globalThis.ModuCore = {
   // was a day inside a time away she had told him about (a trip)? → her line, or ''
   awayTold,
   // persona + brain
-  pronouns, assemble, buildContext, contextBlocks, setContextBlock, resetContextBlocks, modelTuning, personaState, refreshLife,
+  pronouns, assemble, buildContext, chatSignals, contextBlocks, setContextBlock, resetContextBlocks, modelTuning, personaState, refreshLife,
   // the life block's record types: an app declares its own with lifeTypes.add; the core names none
   lifeTypes,
   // the event log: every app writes what happened through one call; the `events` block reads it
@@ -92,7 +96,7 @@ globalThis.ModuCore = {
   herProfile, loadHerProfile, setHerProfile, userName, herPronouns,
   // the one clock, 主动, her 他找你 settings and 暂停, the side model and the one counted door
   // for every side call (his day's sketch and posts, memory's age-out and tidy, the decider) that 暂停 closes
-  clock: ticker, reach, sideCall, calls, sideSettings, useSettings, loadReach, saveReach, paused,
+  clock: ticker, reach, sideCall, calls, sideSettings, useSettings, loadReach, saveReach, paused, lead,
 };
 delete globalThis[Symbol.for('modu.core')];   // the core's files are all loaded: nothing outside them reaches its insides
 })(globalThis[Symbol.for('modu.core')]);

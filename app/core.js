@@ -171,11 +171,18 @@ async function writeFile(dir, path, content){
 }
 async function readText(dir, n){ try { return await (await (await dir.getFileHandle(n)).getFile()).text(); } catch { return null; } }
 async function readBlob(dir, n){ try { return await (await dir.getFileHandle(n)).getFile(); } catch { return null; } }
+// The same read when the answer matters: a file that is not there is null; one that is there and would not read throws.
+// readText cannot tell them apart, and a card that failed to read must never look like a companion with no card.
+async function readKept(dir, n){
+  try { return await (await (await dir.getFileHandle(n)).getFile()).text(); }
+  catch(e){ if (e && (e.name === 'NotFoundError' || e.name === 'TypeMismatchError')) return null; throw e; }
+}
 
 // --- This browser's own storage (IndexedDB) ----------------------------------------------
 // One connection, kept (one per get / put costs thousands of opens for a big import); opened again when the
 // browser closes it (another tab upgrading, Safari dropping it after the tab was in the background). A transaction
-// that aborts (storage full: the put succeeds, then the commit aborts) rejects; it never hangs.
+// that aborts (storage full: the put succeeds, then the commit aborts) rejects; it never hangs. steady(), below, tries
+// such a call again on a fresh connection.
 let dbOpen = null;
 function idb(){
   return dbOpen = dbOpen || new Promise((res, rej) => {
@@ -197,31 +204,99 @@ function tx(name, mode, fn, again){ return idb().then(db => new Promise((res, re
 // (setEnv({ storage })): get / put / del / keys on a table ('kv' or 'vfs'), each a Promise. The default is
 // IndexedDB when the runtime has it, else memory (kept for as long as the core runs). Optional:
 // putMany(table, [[key, value], …]) writes them all or none (one transaction); keys(table, prefix) may list only the
-// keys that start with prefix (callers still check, so a host's keys(table) that lists all of them is fine).
+// keys that start with prefix (callers still check, so a host's keys(table) that lists all of them is fine);
+// reopen() drops the connection, so the next call makes a fresh one (asked for before a call is tried again).
 const idbStorage = { kind:'indexeddb',
   get: (t, k) => tx(t, 'readonly', s => s.get(k)),
   put: (t, k, v) => tx(t, 'readwrite', s => { s.put(v, k); }),
   putMany: (t, entries) => tx(t, 'readwrite', s => { for (const [k, v] of entries) s.put(v, k); }),
   del: (t, keys) => tx(t, 'readwrite', s => { for (const k of keys) s.delete(k); }),
-  keys: (t, pre) => tx(t, 'readonly', s => s.getAllKeys(pre ? IDBKeyRange.bound(pre, pre + '\uffff') : undefined)) };
+  keys: (t, pre) => tx(t, 'readonly', s => s.getAllKeys(pre ? IDBKeyRange.bound(pre, pre + '\uffff') : undefined)),
+  reopen: () => { const was = dbOpen; dbOpen = null; return was ? was.then(db => db.close(), () => {}) : undefined; } };
 function memoryStorage(){
   const T = new Map(), m = t => { if (!T.has(t)) T.set(t, new Map()); return T.get(t); };
   return { kind:'memory', get: async (t, k) => m(t).get(k), put: async (t, k, v) => { m(t).set(k, v); },
            putMany: async (t, entries) => { for (const [k, v] of entries) m(t).set(k, v); },
            del: async (t, keys) => { for (const k of keys) m(t).delete(k); }, keys: async t => [...m(t).keys()].sort() };
 }
+// A call the browser cut off goes again by itself, on a fresh connection (AGAIN: the waits before the 2nd and 3rd try).
+// Safe to repeat: every call sets keys to values or reads them, so nothing is doubled even when the commit had landed
+// and was still reported lost. A full phone is not tried again: that cannot help. err.tries says how many were made.
+const CUT_OFF = ['AbortError', 'UnknownError', 'InvalidStateError', 'TransactionInactiveError'];
+const isFull = e => !!e && (e.name === 'QuotaExceededError' || /quota/i.test(e.message || ''));
+const AGAIN = [80, 400];
+const REPEATABLE = new Set(['get', 'put', 'putMany', 'del', 'keys']);
+const pause = ms => new Promise(r => setTimeout(r, ms));
+async function again(s, f, args){
+  for (let i = 0; ; i++){
+    try { return await f.apply(s, args); }
+    catch(e){
+      if (i >= AGAIN.length || isFull(e) || !e || !CUT_OFF.includes(e.name)){ try { e.tries = i + 1; } catch {} throw e; }
+      console.warn('storage cut off, trying again:', e.name);
+      if (s.reopen){ try { await s.reopen(); } catch {} }
+      await pause(AGAIN[i]);
+    }
+  }
+}
+const steadied = new WeakMap();
+function steady(s){
+  if (!steadied.has(s)) steadied.set(s, new Proxy(s, { get: (t, k) => REPEATABLE.has(k) && typeof t[k] === 'function' ? (...a) => again(t, t[k], a) : t[k] }));
+  return steadied.get(s);
+}
 let ownStorage = null;
-function storage(){ return env.storage || (ownStorage = ownStorage || (typeof indexedDB !== 'undefined' ? idbStorage : memoryStorage())); }
+// indexedDB can be missing, null (some in-app browsers) or throw when touched (storage blocked): each is memory, and
+// storageCheck says so
+function hasIdb(){ try { return !!globalThis.indexedDB; } catch { return false; } }
+function storage(){ return steady(env.storage || (ownStorage = ownStorage || (hasIdb() ? idbStorage : memoryStorage()))); }
 const kvSet = (k, v) => storage().put('kv', k, v);
-// A write the browser refused, in plain words (err.code says which, for a page with its own words)
-function storageError(e){
-  if (!e || e.code === 'storage-full' || e.code === 'storage-lost') return e;
-  const full = e.name === 'QuotaExceededError' || /quota/i.test(e.message || '');
-  const lost = !full && ['AbortError', 'UnknownError', 'InvalidStateError', 'TransactionInactiveError'].includes(e.name);
-  if (!full && !lost) return e;
+// A write the browser refused, in plain words (err.code says which, for a page with its own words). step says how far
+// it got: 'write', 'read-back', 'list', 'read', 'fetch' (STEP_WORDS); saveFailure(err) makes the line she can copy.
+function storageError(e, step){
+  if (!e) return e;
+  const mark = x => { if (step && !x.step){ try { x.step = step; } catch {} } return x; };
+  if (e.code === 'storage-full' || e.code === 'storage-lost' || e.code === 'storage-read') return mark(e);
+  const full = isFull(e), lost = !full && CUT_OFF.includes(e.name);
+  if (!full && !lost) return mark(e);
   const out = new Error(full ? '手机的存储空间不够了，没有存上。清理一些空间后再试一次' : '没有存上（这次保存被打断了），请再试一次');
   out.code = full ? 'storage-full' : 'storage-lost'; out.cause = e;
-  return out;
+  return mark(out);
+}
+// What is there and would not read (never "no such companion"): her files stay, and the words say to try again
+function readError(e){
+  if (!e || e.code === 'storage-read') return e;
+  return Object.assign(new Error('这次读不出来（手机的存储没有回应），资料还在，请再试一次'), { code: 'storage-read', cause: e, step: 'read' });
+}
+// One line for a tester to copy, in place of a guess: the step, the file and its size, the error the browser really gave,
+// how many tries, this browser and its storage. Nothing of hers: no card, no chat, no name. The err may be any error.
+const STEP_WORDS = { write:'写入', 'read-back':'写完读回', list:'写联系人名单', read:'读取', fetch:'取默认角色', open:'打开' };
+function saveFailure(e){
+  if (!e) return '';
+  let r = e; for (let i = 0; i < 5 && r.cause; i++) r = r.cause;
+  const find = k => { let x = e; for (let i = 0; i < 6 && x; i++, x = x.cause) if (x[k] != null) return x[k]; return null; };
+  const step = find('step'), file = find('file'), size = find('size'), tries = find('tries');
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+  const browser = (ua.match(/(?:EdgA?|HuaweiBrowser|HBPC|Quark|UCBrowser|MiuiBrowser|VivoBrowser|HeyTapBrowser|SamsungBrowser|Firefox|CriOS|Chrome|Version)\/[\d.]+/g) || []).slice(-1)[0] || '';
+  return ['出错记录', STEP_WORDS[step] || step, file && (file + (size != null ? ' ' + (size / 1048576).toFixed(1) + 'MB' : '')), r.name || 'Error', r.message && String(r.message).slice(0, 80),
+    tries > 1 && `试了${tries}次`, browser.replace(/\.\d+\.\d+$/, ''), storage().kind].filter(Boolean).join(' · ');
+}
+// Can this browser keep anything? Tries a small write and a picture-sized one (Chromium keeps a value over 64 KB as a file
+// of its own beside its database, a different path), then takes them away.
+// → { ok, kind, why, small, big }: small and big are 'ok', the error's name or 'no-answer'; why is 'no-indexeddb'
+// (memory: gone when the page closes), 'writes' or 'big-writes'. Never throws. { wait } in ms is how long an answer may take.
+const CHECK_KEY = '.modu-check', CHECK_SIZE = 256 * 1024;
+async function storageCheck(o = {}){
+  const s = storage(), kind = s.kind || 'host';
+  if (kind === 'memory' && !env.storage) return { ok: false, kind, why: 'no-indexeddb', small: 'ok', big: 'ok' };
+  const wait = Number(o.wait) || 6000;
+  const attempt = async (t, v) => {
+    let timer = null;
+    const late = new Promise(r => { timer = setTimeout(() => r('no-answer'), wait); });
+    const done = (async () => { await s.put(t, CHECK_KEY, v); await s.get(t, CHECK_KEY); await s.del(t, [CHECK_KEY]); return 'ok'; })().catch(e => (e && e.name) || 'Error');
+    const r = await Promise.race([done, late]); clearTimeout(timer); return r;
+  };
+  const small = await attempt('kv', 1);
+  const big = small === 'ok' ? await attempt('vfs', { kind:'file', data: new ArrayBuffer(CHECK_SIZE) }) : small;
+  return { ok: small === 'ok' && big === 'ok', kind, why: small !== 'ok' ? 'writes' : big !== 'ok' ? 'big-writes' : '', small, big };
 }
 const kvGet = k => storage().get('kv', k);
 
@@ -229,6 +304,7 @@ const kvGet = k => storage().get('kv', k);
 // Phones have no folder picker (that is desktop Chrome / Edge only), so there the companion's folder
 // lives in the browser's own storage, with the same files and the same interface as a real folder:
 // the rest of the core cannot tell the difference. Lost if she clears the browser's site data.
+const SAVE_PIECE = 1 << 20;
 class VFile {
   constructor(path, name){ this.kind = 'file'; this.path = path; this.name = name; }
   async getFile(){ const v = await storage().get('vfs', this.path); if (!v || v.kind !== 'file') throw new DOMException('not found', 'NotFoundError'); return new File([v.data], this.name); }
@@ -257,10 +333,14 @@ class VDir {
     }
   }
   async removeEntry(n){ const p = this.path + '/' + n, keys = await storage().keys('vfs', p); await storage().del('vfs', keys.filter(k => k === p || k.startsWith(p + '/'))); }
-  // A whole new folder <name> inside this one, every file in ONE write, so it is all there or not there at all
-  // (a closed tab, a full phone). files: { 'path/in/folder': text | ArrayBuffer | Uint8Array | Blob }. → the new VDir,
-  // or null when the storage cannot write many at once (a host's own without putMany; the caller writes one by one).
-  async writeFolder(name, files){
+  // A whole new folder <name> inside this one, all there or not there at all (a closed tab, a full phone), in ONE write.
+  // files: { 'path/in/folder': text | ArrayBuffer | Uint8Array | Blob }. → the new VDir, or null when the storage cannot
+  // write many at once (a host's own without putMany; the caller writes one by one).
+  // o.saving = { file, text }: a save note. Then a folder over SAVE_PIECE goes in pieces: `text` (state 'saving') first,
+  // text before pictures, no piece over SAVE_PIECE but a file alone, and files[file] (state 'saved') alone at the very
+  // end. A long transaction is what a backgrounded tab or a big value loses, and a retry then repeats one piece, not all
+  // of him. The note keeps it all or nothing: a save cut off between pieces is 'saving', which the next start clears.
+  async writeFolder(name, files, o = {}){
     const s = storage(); if (!s.putMany) return null;
     const top = this.path + '/' + name, out = new Map([[top, { kind:'directory' }]]);
     for (const [p, c] of Object.entries(files)){
@@ -268,7 +348,18 @@ class VDir {
       for (let i = 1; i < parts.length; i++) out.set(top + '/' + parts.slice(0, i).join('/'), { kind:'directory' });
       out.set(top + '/' + p, { kind:'file', data: await new Blob([c]).arrayBuffer() });
     }
-    await s.putMany('vfs', [...out]);
+    const size = [...out.values()].reduce((a, v) => a + (v.data ? v.data.byteLength : 0), 0);
+    if (!o.saving || size <= SAVE_PIECE){ await s.putMany('vfs', [...out]); return new VDir(top); }
+    const noteKey = top + '/' + o.saving.file, last = out.get(noteKey); out.delete(noteKey);
+    const first = await new Blob([o.saving.text]).arrayBuffer();
+    const all = [...out], dirs = all.filter(e => !e[1].data), rest = all.filter(e => e[1].data).sort((a, b) => a[1].data.byteLength - b[1].data.byteLength);
+    await s.putMany('vfs', dirs.concat([[noteKey, { kind:'file', data: first }]]));
+    for (let i = 0; i < rest.length;){
+      const piece = [rest[i]]; let n = rest[i++][1].data.byteLength;
+      while (i < rest.length && n + rest[i][1].data.byteLength <= SAVE_PIECE){ n += rest[i][1].data.byteLength; piece.push(rest[i++]); }
+      await s.putMany('vfs', piece);
+    }
+    await s.putMany('vfs', [[noteKey, last]]);
     return new VDir(top);
   }
   async queryPermission(){ return 'granted'; }
@@ -277,7 +368,7 @@ class VDir {
 const phoneRoot = () => new VDir('modu');
 const canPickFolder = () => !!globalThis.showDirectoryPicker;
 
-Object.assign(core, { writeFile, readText, readBlob, storage, kvSet, kvGet, storageError, VDir, phoneRoot, canPickFolder });
+Object.assign(core, { writeFile, readText, readBlob, readKept, storage, kvSet, kvGet, storageError, readError, saveFailure, storageCheck, VDir, phoneRoot, canPickFolder });
 })(globalThis[Symbol.for('modu.core')]);
 // app/core/lore.js: 世界书 (lorebook) entries: read both card shapes, match keys against the chat, and the timing set (chance, groups, sticky / cooldown / delay, recursion).
 // One of the core's files, loaded in the order of app/core/index.json; app/core.js is all of them joined
@@ -293,7 +384,11 @@ function loreEntries(book){
   if (!book) return [];
   const raw = Array.isArray(book.entries) ? book.entries : Object.values(book.entries || {});
   return raw.filter(e => e && typeof e.content === 'string' && e.content.trim()).map((e, i) => {
-    const x = e.extensions || {}, pick = k => x[k] !== undefined ? x[k] : e[k];
+    // a V2 character_book keeps these in `extensions` in snake_case (prevent_recursion, group_override, use_probability),
+    // a world-info file on the entry in camelCase. Only camelCase was read, so a traded card's recursion, group and chance
+    // settings were silently ignored: an author's "prevent recursion" on every entry still recursed. Both names now
+    const snake = k => k.replace(/[A-Z]/g, c => '_' + c.toLowerCase());
+    const x = e.extensions || {}, pick = k => [x[k], x[snake(k)], e[k], e[snake(k)]].find(v => v !== undefined);
     const pos = pick('position');   // 0 before char, 1 after, 4 at depth; or 'before_char' / 'after_char'
     const keys = [].concat(e.keys || e.key || []).map(String).map(s => s.trim()).filter(Boolean);
     const sec = [].concat(e.secondary_keys || e.keysecondary || []).map(String).map(s => s.trim()).filter(Boolean);
@@ -497,6 +592,25 @@ function dropFinalStop(line){ const s = String(line == null ? '' : line), t = s.
 // model wrote; the chat shows it without (splitParts), and his past replies reach the prompt without, so the
 // history does not teach the 。 back.
 function chatStops(text){ return String(text == null ? '' : text).split('\n').map(l => /\*\s*$/.test(l) ? l : dropFinalStop(l)).join('\n'); }
+// Some models head his lines with his name, as in a script ("Alex(小明)" on a line of its own, or "小明：…"), most of all when
+// the card's name is long, and each one came out as a bubble of its own. → the text with those heads gone: a line that is
+// only his name (the card's whole name, or either half of "Alex(小明)"), when more follows, and a name with a colon in
+// front of a line. What he says about himself stays. For the screen and his prompt: his chat file keeps what the model wrote.
+const squeeze = s => String(s).replace(/\s+/g, '').replace(/（/g, '(').replace(/）/g, ')').toLowerCase();
+function nameForms(name){
+  const n = String(name || '').trim(), m = n.match(/^(.*?)\s*[(（]\s*(.*?)\s*[)）]\s*$/);
+  return [n].concat(m ? [m[1], m[2]] : []).map(squeeze).filter((x, i) => x.length >= 2 || (i === 0 && x));
+}
+function dropNames(text, name){
+  const forms = nameForms(name), t = String(text == null ? '' : text);
+  if (!forms.length) return t;
+  const lines = t.split('\n'), bare = l => squeeze(l).replace(/^[*【\[「]+|[*】\]」:：]+$/g, '');
+  const headed = l => { const s = l.replace(/^[\s*]+/, ''), c = s.search(/[:：]/); return c > 0 && forms.includes(bare(s.slice(0, c))) ? s.slice(c + 1).replace(/^[\s*]+/, '') : null; };
+  return lines.map((l, i) => {
+    if (forms.includes(bare(l)) && lines.slice(i + 1).some(x => x.trim())) return null;
+    const rest = headed(l); return rest ? rest : l;
+  }).filter(l => l !== null).join('\n');
+}
 // His reply as the chat shows it: [{ kind: 'say' | 'act', text }]. 'say' is a bubble (its final 。
 // dropped); 'act' is what he does (between asterisks, or （…）/(…) as a whole line; or a first line
 // that narrates him in the third person, "他刚收了碗。", when more lines follow), shown as a quiet line
@@ -505,7 +619,7 @@ function chatStops(text){ return String(text == null ? '' : text).split('\n').ma
 // ("他又迟到了。" about a colleague, followed by more lines) is read as narration.
 function splitParts(text, opts = {}){
   const out = [], name = String(opts.name || ''), pro = String(opts.pronoun || '');
-  const bubbles = splitBubbles(text);
+  const bubbles = splitBubbles(dropNames(text, name));
   bubbles.forEach((b, bi) => {
     if (/^[（(][^（）()]+[)）]$/.test(b)) { out.push({ kind:'act', text: b.slice(1, -1).trim() }); return; }
     for (const part of b.split(/(\*[^*]+\*)/)){
@@ -630,7 +744,7 @@ function parseReply(raw){
 // It reads through parseReply, so the other optional tags are cut from the text too.
 function splitEmotion(text){ const r = parseReply(text); return { text: r.text, emotion: r.emotion, labelled: r.labelled }; }
 
-Object.assign(core, { EMOTIONS, splitBubbles, dropFinalStop, chatStops, splitParts, tidyCJK, parseReply,
+Object.assign(core, { EMOTIONS, splitBubbles, dropFinalStop, chatStops, dropNames, splitParts, tidyCJK, parseReply,
   splitEmotion, photoTags });
 })(globalThis[Symbol.for('modu.core')]);
 // app/core/memory.js: memory files: memory/*.md with front matter, read, written, added, edited, pinned, deleted by hand.
@@ -807,7 +921,11 @@ async function deleteMemory(it){
   store.memory = store.memory.filter(m => m !== it); emit('memory', store.memory);
 }
 
-Object.assign(core, { MEMORY_FORMAT, memoryNeedsMigration, parseMemoryFile, readMemory, slug, memoryBody, saveMemoryItem, addMemory, editMemory,
+// a said fact that is a moment, not a state (今晚, 刚, 正在, now): the memory job keeps no new one, and one kept before ends
+// with its day in the current state
+const MOMENT = /今晚|今天|刚才|刚刚|刚[^好才]|正在|现在|此刻|这会儿|tonight|today|right now|just now/i;
+
+Object.assign(core, { MOMENT, MEMORY_FORMAT, memoryNeedsMigration, parseMemoryFile, readMemory, slug, memoryBody, saveMemoryItem, addMemory, editMemory,
   pinMemory, deleteMemory, datedWords });
 })(globalThis[Symbol.for('modu.core')]);
 // app/core/import.js: import: a card (PNG / JSON), a 酒馆 chat, memories she already has, the c.ai app export, staged before saving.
@@ -1453,7 +1571,7 @@ Object.assign(core, { readPngTexts, normaliseCard, readCardFile, parseChat, choo
 (function(core){
 'use strict';
 const { emit, store, hostFetch, markUntimely, now, writeFile, readText, readBlob, VDir, readMemory, slug, memoryBody, MEMORY_FORMAT,
-  parseChat, stageImport, storageError, kvGet } = core;
+  parseChat, stageImport, storageError, readError, readKept, kvGet } = core;
 
 // The store folder's files.
 function buildStoreFiles(st){
@@ -1490,28 +1608,31 @@ function folderName(s){
   return /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/i.test(n) ? '_' + n : n;
 }
 // A save is never half there. A folder being saved holds SAVING ({ v, writer, state, at });
-// in the in-browser folder every file goes in ONE write (VDir.writeFolder), state 'saved', so a closed tab leaves all
-// of him or nothing; in a real folder (and a host's storage that cannot write many at once) it says 'saving' first,
-// then every file, then 'saved'. loadFromDir takes the note away once he is in her contacts. At boot, loadContacts
+// in the in-browser folder a small companion goes in ONE write (VDir.writeFolder), state 'saved', so a closed tab leaves
+// all of him or nothing; a big one goes there in pieces, and in a real folder (and a host's storage that cannot write many
+// at once) file by file: it says 'saving' first, then the files, then 'saved'. loadFromDir takes the note away once he is in her contacts. At boot, loadContacts
 // gives back a 'saved' folder that never reached her contacts and clears a 'saving' one (recoverSaves, contacts.js);
 // in a real folder the next save of that name clears it (freeName), and 打开已有的文件夹 says it was not finished.
 const SAVING = '.modu-saving.json';
-async function savingNote(dir){
-  const t = await readText(dir, SAVING); if (t === null) return null;
+async function savingNote(dir, read = readText){
+  const t = await read(dir, SAVING); if (t === null) return null;
   try { const j = JSON.parse(t); if (j && typeof j === 'object') return j; } catch {}
   return { state:'saving' };   // cut short while it was written: not finished
 }
 async function writeFolder(root, name, files){
   const note = state => JSON.stringify({ v: 1, writer: 'modu', state, at: now().getTime() });
   let one = null;
-  // a one-transaction save the browser aborts for any reason but a full phone (WebKit and a very big companion)
-  // goes again file by file, between the save notes: slower, still put right after a closed tab
-  try { one = root.writeFolder ? await root.writeFolder(name, Object.assign({ [SAVING]: note('saved') }, files)) : null; }
+  // a save the browser keeps aborting (tried again already) for any reason but a full phone goes again file by file,
+  // between the save notes: slower, still put right after a closed tab, and it names the file that would not go in
+  try { one = root.writeFolder ? await root.writeFolder(name, Object.assign({ [SAVING]: note('saved') }, files), { saving: { file: SAVING, text: note('saving') } }) : null; }
   catch(e){ if (storageError(e).code === 'storage-full') throw e; console.error('one write refused, file by file:', e); await dropFolder(root, name); }
   if (one) return one;
   const dir = await root.getDirectoryHandle(name, { create:true });
   await writeFile(dir, SAVING, note('saving'));
-  for (const [p, c] of Object.entries(files)) await writeFile(dir, p, c);
+  for (const [p, c] of Object.entries(files)){
+    try { await writeFile(dir, p, c); }
+    catch(e){ try { e.file = p; e.size = new Blob([c]).size; } catch {} throw e; }
+  }
   await writeFile(dir, SAVING, note('saved'));
   return dir;
 }
@@ -1561,16 +1682,17 @@ async function saveInto(st, root, locked){
     const name = await freeName(root, folderName(st.name));
     let dir;
     try { dir = await writeFolder(root, name, files); }
-    catch(e){ await dropFolder(root, name); throw storageError(e); }
+    catch(e){ await dropFolder(root, name); throw storageError(e, 'write'); }
     stayed = !was || !wasName || (core.currentId === was && store.name === wasName);   // nobody was open: he opens
     // what we just wrote cannot be read back (another tab's start removed it, on a phone with no Web Locks):
     // the save was cut off, said as that (never "no companion in this folder"), and what is left of it goes
     try { if (stayed) await loadFromDir(dir); else await listOnly(dir, st); }
-    catch(e){ await dropFolder(root, name); throw storageError(Object.assign(new DOMException('the folder was taken away while it was saved', 'AbortError'), { cause: e })); }
+    catch(e){ await dropFolder(root, name); throw storageError(Object.assign(new DOMException('the folder was taken away while it was saved', 'AbortError'), { cause: e }), 'read-back'); }
     return dir;
   });
   // her own companion in the in-browser folder: ask the browser to keep it (Safari's 7 days, Android's clean-up)
-  if (dir instanceof VDir && !st.seeded && !st.sample) keepStorage().then(persisted => emit('storage', { persisted }), () => {});
+  if (dir instanceof VDir && core.storage().kind === 'memory') emit('storage', { persisted: false, where: 'memory' });
+  else if (dir instanceof VDir && !st.seeded && !st.sample) keepStorage().then(persisted => emit('storage', { persisted }), () => {});
   if (stayed) await queueImported(st);   // the memory job works on the open companion: not when she is with someone else
   return dir;
 }
@@ -1646,18 +1768,22 @@ function resetStore(){
   core.folderData = null;
   Object.assign(store, { dir:null, name:'', card:null, cardSource:null, meta:{}, msgs:[], memory:[], writable:false, avatarURL:'', source:'', folderName:'', importedAt:0, seeded:false, pronounNote:null, cardFolder:null, params:null });
 }
-// Everything is read and checked first; the open companion is left as he was until then.
+// Everything is read and checked first; the open companion is left as he was until then. A file that is there and would
+// not read stops it (err.code 'storage-read'): he never opens as a name with no card, answering as a bare model.
 async function loadFromDir(dir){
-  const note = await savingNote(dir);
+  let note, cardJ, chatRaw, man;
+  try { note = await savingNote(dir, readKept); cardJ = await readKept(dir, 'card.json'); chatRaw = await readKept(dir, 'chat.jsonl'); man = await readKept(dir, 'manifest.json'); }
+  catch(e){ throw readError(e); }
   if (note && note.state !== 'saved') throw Object.assign(new Error('这个文件夹没有搬完（上次被打断了），请重新搬家'), { code: 'unfinished' });
   // an empty chat.jsonl counts as no file
-  const cardJ = await readText(dir, 'card.json'), chatRaw = await readText(dir, 'chat.jsonl'), chatT = chatRaw && chatRaw.trim() ? chatRaw : null;
-  if (!cardJ && !chatT) throw new Error('这个文件夹里没有角色');
+  const chatT = chatRaw && chatRaw.trim() ? chatRaw : null;
+  if (!cardJ && !chatT) throw Object.assign(new Error('这个文件夹里没有角色'), { code: 'no-companion' });
   let cj = null;
   if (cardJ){ try { cj = JSON.parse(cardJ); } catch {} if (!cj || typeof cj !== 'object') throw Object.assign(new Error('这个文件夹里的角色卡坏了，打不开'), { code: 'broken-card' }); }
   let c; try { c = chatT ? parseChat(chatT) : { meta:{}, msgs:[] }; } catch { throw Object.assign(new Error('这个文件夹里的聊天记录坏了，打不开'), { code: 'broken-chat' }); }
-  const man = await readText(dir, 'manifest.json');
   let mj = null; try { mj = JSON.parse(man); } catch {}
+  // his manifest says a card was saved and it is not here: a chat with nobody behind it. Refused, his chat left as it is
+  if (!cardJ && mj && Array.isArray(mj.files) && mj.files.includes('card.json')) throw Object.assign(new Error('角色卡不见了，打不开。聊天记录还在，可以从备份恢复，或者重新导入角色卡'), { code: 'card-missing' });
   // when he moved in. Imported messages dated after that moment are shown undated (a folder
   // from before imported_msgs: every message dated after now); and his move-in counts as a moment they
   // were together, so he is not 睡着了 in the middle of it.
@@ -1768,7 +1894,7 @@ Object.assign(core, { buildStoreFiles, saveImport, saveImportLocked, folderName,
 // (python -I app/core/join.py). A name from another core file is `core.name` (or taken at the top).
 (function(core){
 'use strict';
-const { emit, store, env, hostFetch, msgDate, storage, kvSet, kvGet, VDir, phoneRoot, stageImport, saveImport, resetStore,
+const { emit, store, env, hostFetch, msgDate, storage, storageError, saveFailure, kvSet, kvGet, VDir, phoneRoot, stageImport, saveImport, resetStore,
   loadFromDir, readText, SAVING, savingNote, saveLock, parseChat } = core;
 
 // --- Contacts: every companion this browser knows, newest first ----------------------------------
@@ -1792,7 +1918,15 @@ async function loadContacts(){
   if (!recovering) recovering = read().then(ok => ok ? recoverSaves().then(async back => { await finishRemovals(); return back; }) : []).catch(e => console.error('recover:', e));
   await recovering;
   await read();
+  await markMissing();
   return core.contacts;
+}
+// A contact in the in-browser folder with neither card nor chat there: said on his row (filesMissing, for this visit, never
+// saved) and when she taps him. Her list is not changed: a companion leaves only on her own yes.
+async function markMissing(){
+  if (unread) return;
+  let has; try { has = new Set((await storage().keys('vfs', 'modu/')).map(String)); } catch(e){ console.error(e); return; }
+  for (const c of core.contacts) if (c.where === 'phone' && c.vpath) c.filesMissing = !has.has(c.vpath + '/card.json') && !has.has(c.vpath + '/chat.jsonl');
 }
 let unread = false;   // true after her list could not be read: saveContacts writes nothing over it until a read works
 // Once a visit, before anyone reads the contacts: a save a closed tab cut off is never left hidden.
@@ -1885,12 +2019,20 @@ async function usedBy(c){
   if (!msgs && c.vpath){ try { msgs = parseChat(await readText(new VDir(c.vpath), 'chat.jsonl') || '').msgs; } catch { msgs = []; } }
   return (msgs || []).some(m => m && m.is_user);
 }
+// → false when the list could not be kept. Said once, not at every message; a save it failed for has its folder and
+// its note, so the next start gives him back (recoverSaves).
+let listRefused = false;
 async function saveContacts(){
-  if (core.ephemeral || unread) return;
+  if (core.ephemeral || unread) return true;
   try {
-    await kvSet('contacts', core.contacts.filter(c => c.where !== 'demo').map(c => { const o = Object.assign({}, c); delete o.snap; return o; }));
+    await kvSet('contacts', core.contacts.filter(c => c.where !== 'demo').map(c => { const o = Object.assign({}, c); delete o.snap; delete o.filesMissing; return o; }));
     await kvSet('currentId', core.currentId);
-  } catch(e){ console.error(e); }
+    listRefused = false; return true;
+  } catch(e){
+    console.error(e);
+    if (!listRefused){ listRefused = true; emit('error', '联系人名单没存上，下次打开时会再放回去：' + saveFailure(storageError(e, 'list'))); }
+    return false;
+  }
 }
 // a contact's small picture: the host's own (setEnv thumb), else a canvas; with no document (a backend), none
 // a tall picture is cut toward its top (where the face is), as the round .av shows it (center 22%)
@@ -1946,7 +2088,13 @@ async function openContact(id){
   if (c.where === 'demo'){ if (!c.snap) return false; resetStore(); Object.assign(store, c.snap); core.currentId = c.id; emit('loaded', store); return true; }
   const dir = c.where === 'phone' ? new VDir(c.vpath) : c.dir;
   if (c.where === 'folder' && (await dir.queryPermission({ mode:'readwrite' })) !== 'granted' && (await dir.requestPermission({ mode:'readwrite' })) !== 'granted') return false;
-  await loadFromDir(dir); return true;
+  try { await loadFromDir(dir); }
+  catch(e){
+    if (c.where !== 'phone' || (e && e.code) !== 'no-companion') throw e;
+    c.filesMissing = true; emit('contacts', core.contacts);
+    throw Object.assign(new Error(`${c.name}的资料不在这部手机上了，打不开。有备份的话可以从备份恢复；也可以长按把这一行删掉`), { code: 'files-missing', cause: e });
+  }
+  return true;
 }
 async function canOpenWithoutAsking(c){
   if (!c) return false; if (c.where === 'phone') return true; if (c.where !== 'folder') return false;
@@ -1976,24 +2124,36 @@ async function removeContact(id, opts = {}){
 // never brings him back. The demo (ephemeral) never seeds.
 // char_zh.png in Chinese mode, char_en.png with { lang:'en' }.
 const FIRST_COMPANION = { zh: 'char_zh.png', en: 'char_en.png' };
-// a first run that failed leaves its reason in core.firstRunError ('' when it did not fail), so 搬家 can say it
-// instead of opening with nobody and no word why
-core.firstRunError = '';
+// a first run that failed leaves its reason in core.firstRunError ('' when it did not fail) and the line to copy in
+// core.firstRunDetail, so the phone can say it instead of opening with nobody and no word why
+core.firstRunError = ''; core.firstRunDetail = '';
+// somebody she could open in the in-browser folder. A folder with no card and no chat, or one a failed save left (not
+// 'saved'), is nobody: counting it wrote the firstRun note and left a phone empty for good
+async function someoneInFolder(){
+  const keys = (await storage().keys('vfs', 'modu/')).map(String).filter(k => k.startsWith('modu/')), has = new Set(keys);
+  for (const n of new Set(keys.map(k => k.split('/')[1]))){
+    const path = 'modu/' + n;
+    if (!has.has(path + '/card.json') && !has.has(path + '/chat.jsonl')) continue;
+    const note = has.has(path + '/' + SAVING) ? await savingNote(new VDir(path)) : null;
+    if (!note || note.state === 'saved') return true;
+  }
+  return false;
+}
 async function firstRun(base = '../samples/', { lang = 'zh' } = {}){
   const first = FIRST_COMPANION[lang] || FIRST_COMPANION.zh;
   if (core.ephemeral) return null;
-  core.firstRunError = '';
+  core.firstRunError = ''; core.firstRunDetail = '';
   try {
     { const note = await kvGet('firstRun'); if (note){ await newSeedPicture(base, note); return null; } }
     await loadContacts();
-    const someone = async () => core.contacts.length || ((await kvGet('contacts')) || []).length || (await storage().keys('vfs', 'modu/')).some(k => String(k).startsWith('modu/'));
+    const someone = async () => core.contacts.length || ((await kvGet('contacts')) || []).length || await someoneInFolder();
     if (await someone()){
       // the default companion saved, then the tab closed before this note: he is still the one firstRun seeded
       let seeded = null;
       for (const c of core.contacts) if (!seeded && c.where === 'phone' && c.vpath){ try { if (JSON.parse(await readText(new VDir(c.vpath), 'manifest.json') || 'null').seeded) seeded = c; } catch {} }
       await kvSet('firstRun', seeded ? { at: core.now().getTime(), seeded: seeded.name, id: seeded.id } : { at: core.now().getTime(), seeded:'' }); return null;
     }
-    const r = await hostFetch(base + first); if (!r.ok) throw new Error(r.status);
+    const r = await hostFetch(base + first); if (!r.ok) throw Object.assign(new Error(r.status), { step: 'fetch', file: first });
     const st = await stageImport([new File([await r.blob()], first, { type:'image/png' })]);
     st.seeded = true;   // put here by Modu, not brought by her: no "he just arrived" (seam presence)
     // looked at again inside the save lock, so a companion she is moving in at this moment (another tab, or 搬家
@@ -2006,7 +2166,7 @@ async function firstRun(base = '../samples/', { lang = 'zh' } = {}){
       return true;
     });
     return seeded ? current() : null;
-  } catch(e){ console.error('first run:', e); core.firstRunError = String((e && (e.message || e.name)) || e || '?').slice(0, 200); return null; }   // tried again next time
+  } catch(e){ console.error('first run:', e); core.firstRunError = String((e && (e.message || e.name)) || e || '?').slice(0, 200); core.firstRunDetail = saveFailure(e); return null; }   // tried again next time
 }
 // The default companion's old picture (a flat dark cap, read as a 锅盖头) was seeded once, so a phone that has
 // him keeps it. Once, at a later firstRun: the companion firstRun seeded, still in her in-browser folder, whose picture is
@@ -2057,7 +2217,8 @@ async function firstCompanion(o = {}){
 }
 
 Object.assign(core, { loadContacts, saveContacts, thumb, touch, stash, current, register, openContact,
-  canOpenWithoutAsking, removeContact, firstRun, firstCompanion, recoverSaves, addContact, planRemoval, finishRemovals });
+  canOpenWithoutAsking, removeContact, firstRun, firstCompanion, recoverSaves, addContact, planRemoval, finishRemovals,
+  isUnread: () => unread });
 })(globalThis[Symbol.for('modu.core')]);
 // app/core/records.js: records: one folder per record type, one JSON file per record, for every app.
 // One of the core's files, loaded in the order of app/core/index.json; app/core.js is all of them joined
@@ -3253,13 +3414,13 @@ const { clone, now, isoDay, records } = core;
 // offered kind is handed to the apps that take it. `her` is her part of the day, from each app's today(day)
 // hook (and the event log), never by a model call. `mood` is the slot's mood word; `what` an
 // app's own short kind for a line of hers. A slot may carry `said` (his own words in chat
-// that set it: a plan he stated for that time), only when there are some. life.js also keeps `from` ('sketch' | 'skeleton'), `aged` (ms: told to
+// that set it: a plan he stated for that time) and `said_at` (when he said it), only when there are some. life.js also keeps `from` ('sketch' | 'skeleton'), `aged` (ms: told to
 // the memory source) and `line` (a skeleton day's one-liner); a reader keeps fields it does not know. The sketch,
 // the status, her part, the evening and the age-out are app/life.js's.
 const DAY_TYPE = 'day', DAY_ID = /^\d{4}-\d{2}-\d{2}$/;
 function dayShape(r){
   r = r && typeof r === 'object' ? r : {};
-  const slot = s => ({ at: Number(s.at) || 0, until: Number(s.until) || 0, where: String(s.where || ''), doing: String(s.doing || ''), why: String(s.why || ''), busy: s.busy === true, kind: String(s.kind || ''), mood: String(s.mood || ''), ...(s.said ? { said: String(s.said) } : {}) });
+  const slot = s => ({ at: Number(s.at) || 0, until: Number(s.until) || 0, where: String(s.where || ''), doing: String(s.doing || ''), why: String(s.why || ''), busy: s.busy === true, kind: String(s.kind || ''), mood: String(s.mood || ''), ...(s.said ? { said: String(s.said) } : {}), ...(s.said && Number(s.said_at) ? { said_at: Number(s.said_at) } : {}) });
   return Object.assign({}, r, { v: r.v || 1, day: String(r.day || r.id || ''), slots: [].concat(r.slots || []).filter(s => s && typeof s === 'object').map(slot).sort((a, b) => a.at - b.at),
     her: [].concat(r.her || []).filter(h => h && h.line).map(h => ({ at: Number(h.at) || 0, app: String(h.app || ''), line: String(h.line), what: String(h.what || '') })),
     entry: String(r.entry || ''), hints: [].concat(r.hints || []).filter(h => h && h.line) });
@@ -3493,8 +3654,9 @@ const moduDefaults = {
 // order: [{ identifier, enabled }] }] (the global order is character_id 100001; else the longest). A marker (chat
 // history, the card's fields, 世界书 placement) has no text of its own: Modu fills those places itself. Blocks after the
 // chat-history marker are hers to come after the chat. Sampling (temperature, top_p, …) is never applied: it is kept
-// as suggestions only (her model settings decide). → { name, blocks: [{ id, name, role, text, on, after }], sampling,
-// markers } or null for something that is not a preset.
+// as suggestions only (her model settings decide). A block may carry `modu_when`, the name of a chat signal (chatSignals,
+// context.js): it then goes in only on the turns that signal is up, so a habit's words live in the preset, swappable with it.
+// → { name, blocks: [{ id, name, role, text, on, after, when? }], sampling, markers } or null for something that is not a preset.
 const SAMPLING = ['temperature', 'top_p', 'top_k', 'top_a', 'min_p', 'frequency_penalty', 'presence_penalty', 'repetition_penalty', 'openai_max_tokens', 'openai_max_context', 'max_tokens', 'seed'];
 function parsePreset(j){
   if (!j || typeof j !== 'object' || !Array.isArray(j.prompts)) return null;
@@ -3508,7 +3670,7 @@ function parsePreset(j){
     if (s.id === 'chatHistory'){ after = true; markers.push(s.id); continue; }
     const text = typeof p.content === 'string' ? p.content.trim() : '';
     if (p.marker || !text){ markers.push(s.id); continue; }
-    blocks.push({ id: s.id, name: String(p.name || s.id), role: p.role === 'user' || p.role === 'assistant' ? p.role : 'system', text, on: s.on && p.enabled !== false, after });
+    blocks.push(Object.assign({ id: s.id, name: String(p.name || s.id), role: p.role === 'user' || p.role === 'assistant' ? p.role : 'system', text, on: s.on && p.enabled !== false, after }, p.modu_when ? { when: String(p.modu_when) } : {}));
   }
   const sampling = {}; for (const k of SAMPLING) if (j[k] != null && typeof j[k] !== 'object') sampling[k] = j[k];
   return { name: String(j.name || j.preset_name || ''), blocks, sampling, markers };
@@ -4001,6 +4163,7 @@ function readJsonReply(raw){
   try { const o = JSON.parse(s.slice(a, b + 1)); return o && typeof o === 'object' && !Array.isArray(o) ? o : null; } catch { return null; }
 }
 const KNOB_GROUPS = Object.keys(core.DEFAULT_PARAMS || {});
+const CAL_MAX = 6000;   // the answer's room: the whole params file in Chinese, with room for a model that thinks first
 let calibrating = null, calibrateLater = false; const calibratedHashes = new Set();
 core.calibrations = 0;   // how many calibration calls were made in this visit (the cost meter, the tests)
 // A calibration belongs to the companion open when it was asked for. It first waits for his
@@ -4050,7 +4213,10 @@ async function calibrateFor(key, settings, o){
   // one attempt per card and model, kept as a record (calibration/last.json): a model that fails or refuses is not asked
   // again each time the app opens; a new model, or force, asks again
   let last = null; try { last = await recs.get('calibration', 'last'); } catch {}
-  if (!o.force && last && last.hash === hash && last.model === String(s.model || '')) return { ran: false, ok: false, why: 'tried' };
+  // an answer cut off by a smaller room (2500; a long card needs ~4000 characters of JSON, and a model that thinks
+  // first spends some of it there) is asked once more with the room it needs: a record without max is from before that
+  const cutOff = last && last.why === 'unusable' && (Number(last.max) || 2500) < CAL_MAX;
+  if (!o.force && last && last.hash === hash && last.model === String(s.model || '') && !cutOff) return { ran: false, ok: false, why: 'tried' };
   if (!dir && !here()) return { ran: false, ok: false, why: 'switched' };   // no folder of his to keep it in: not asked
   // → '' when the answer may be written now, else why it is let go (see above)
   const blocked = async () => {
@@ -4061,10 +4227,10 @@ async function calibrateFor(key, settings, o){
     for (const f of ['params.her.json', 'params.json']){ const pj = await json(f); if (pj && typeof pj === 'object' && pj.writer !== 'calibration') return 'hand'; }
     return '';
   };
-  const tried = async why => { if (await blocked()) return; try { await recs.commit('calibration', { id: 'last', hash, model: String(s.model || ''), why, at: now().getTime() }, { writer: 'calibration', app: 'calibration' }); } catch {} };
+  const tried = async why => { if (await blocked()) return; try { await recs.commit('calibration', { id: 'last', hash, model: String(s.model || ''), why, max: CAL_MAX, at: now().getTime() }, { writer: 'calibration', app: 'calibration' }); } catch {} };
   const asked = [{ role: 'system', content: text || cardDigest(card) }, { role: 'user', content: cardDigest(card) }];
   calibratedHashes.add(hash); core.calibrations++;
-  let raw; try { raw = await core.sideCall('calibrate', asked, { chat: true, settings: s, max: 2500 }); }
+  let raw; try { raw = await core.sideCall('calibrate', asked, { chat: true, settings: s, max: CAL_MAX }); }
   catch(e){ if (e && e.code === 'paused'){ calibratedHashes.delete(hash); core.calibrations--; calibrateLater = true; return { ran: false, ok: false, why: 'paused' }; }
     await tried('failed'); return { ran: true, ok: false, why: 'failed' }; }
   const got = readJsonReply(raw);
@@ -4153,8 +4319,12 @@ function cardFacts(){
 }
 // → the lines of the current state: { fixed: [text], now: [{ key, value, from: 'said' | 'card' }] }: what he has said wins
 // over the card for a fact memory owns; a fact a state key or counter owns keeps the card's words here
+// a said fact that is a moment (core.MOMENT, memory.js) ends with its day, as state with an end does elsewhere (a plan or a
+// place that is over is closed, never left standing)
+const passed = r => core.MOMENT.test(String(r.value || '')) && core.isoDay(new Date(Number(r.said_at || r.at) || 0)) < core.isoDay(now());
 function currentState(){
-  const f = cardFacts(), said = core.factsNow.key === cardKey() ? core.factsNow.said : {};
+  const f = cardFacts(), all = core.factsNow.key === cardKey() ? core.factsNow.said : {}, said = {};
+  for (const k of Object.keys(all)) if (!passed(all[k])) said[k] = all[k];
   const now2 = f.moving.map(m => { const r = m.owner === 'memory' ? said[m.id] : null; return r && r.value != null && String(r.value).trim() ? { key: m.id, value: String(r.value), from: 'said' } : { key: m.id, value: m.card_says, from: 'card' }; }).filter(x => x.value);
   for (const k of Object.keys(said)) if (!f.moving.some(m => m.id === k) && said[k].value != null && String(said[k].value).trim()) now2.push({ key: String(said[k].key || k), value: String(said[k].value), from: 'said' });
   return { fixed: f.fixed, now: now2 };
@@ -4278,15 +4448,16 @@ const { emit, store, env, msgDate, gapWords, now, kvSet, kvGet, pronouns } = cor
 // the gap since they last talked. Published on the seam as {type:"persona", v:1, state} when it changes.
 const MOOD_LINGER = 2 * 3600 * 1000;
 // His day may say more than a presence word. setDayPlan's fn may return a status object
-//   { presence: 'here' | 'asleep' | 'busy' | null, where, busy, what, since, mood }
+//   { presence: 'here' | 'asleep' | 'busy' | null, where, busy, what, inChat, since, mood }
 // (where: '画室'; busy: true while he cannot really talk; what: what he is doing, in words; since: ms, when it
-// began; mood: a word from his params' moods, e.g. 'tired', or an away mood). The ONE status object stays
+// began; mood: a word from his params' moods, e.g. 'tired', or an away mood; inChat: true while `what` is his own line,
+// still in the chat his prompt reads, so the prompt does not say it twice). The ONE status object stays
 // personaState(): these become its where / busy / what / since / moodWord. A plain word still works.
 function dayStatus(t){
   if (!dayPlan) return null;
   let d = null; try { d = dayPlan(t); } catch { return null; }
   if (d && typeof d === 'object') return { presence: PRESENCE.includes(d.presence) ? d.presence : null, where: String(d.where || ''), busy: d.busy === true,
-    what: String(d.what || d.doing || ''), since: Number(d.since) || null, mood: String(d.mood || '') };
+    what: String(d.what || d.doing || ''), inChat: d.inChat === true, since: Number(d.since) || null, mood: String(d.mood || '') };
   return PRESENCE.includes(d) ? { presence: d, where: '', busy: d === 'busy', what: '', since: null, mood: '' } : null;
 }
 function personaState(){
@@ -4306,7 +4477,8 @@ function personaState(){
     `${name} is ${pw === 'asleep' ? 'asleep, or was until she wrote' : pw === 'busy' ? 'busy with his own things, and sees her message in a spare moment' : 'awake and free'}` +
     (mood !== 'neutral' ? `; the ${mood} from earlier has not quite gone (${gapWords(age)})` : '') + '.';
   const where = st ? st.where : '', what = st ? st.what : '', moodWord = st ? st.mood : '';
-  const more = !name || !(where || what || moodWord) ? '' : ' ' + [what ? `Right now: ${what}` : '', where ? `at ${where}` : '', moodWord ? `feeling ${moodWord}` : ''].filter(Boolean).join(', ') + '.';
+  const parts = [what && !(st && st.inChat) ? `Right now: ${what}` : '', where ? `at ${where}` : '', moodWord ? `feeling ${moodWord}` : ''].filter(Boolean);
+  const more = !name || !parts.length ? '' : ' ' + parts.join(', ') + '.';
   return { v: 1, name, presence: p, doing, mood, moodAt: ld && mood !== 'neutral' ? ld.getTime() : null, lastAt: lastAny ? lastAny.getTime() : null, gapMin: gap == null ? null : Math.round(gap / 60000), pronoun: pr, words: words + more,
     where, busy: st ? (turn ? own === 'busy' : p === 'busy') : p === 'busy' && !turn, what, since: st ? st.since : null, moodWord };   // busy as the one label says
 }
@@ -4416,7 +4588,7 @@ Object.assign(core, { openChannel, personaState, publishPersona, bridge, bridgeC
 (function(core){
 'use strict';
 const { store, fit, clip, msgDate, isoDay, band, clockIn, gapWords, now, cardLore, loreEntries, loreSelect, loreWhen, lunarDate, solarTerm, EMOTIONS, splitBubbles,
-  chatStops, pronouns, lifeKey, lifeLines, eventLines, knownLines, personaState, activityLines, chatCardKind } = core;
+  chatStops, dropNames, pronouns, lifeKey, lifeLines, eventLines, knownLines, personaState, activityLines, chatCardKind } = core;
 
 const EMOTION_RULE = `After your reply, on its own last line, write how you feel as exactly one tag: [emotion: X], where X is one of ${EMOTIONS.join(', ')}. The app reads the tag and shows it as a sticker; the user never sees the tag itself.`;
 // Optional reply tags, asked for only when the caller wants them (assemble / send opts).
@@ -4462,6 +4634,13 @@ const PROMISE_RULE = `When you tell her you will do something for her later (wak
 const BUBBLE_RULE = `Write like texting on a phone: each message on its own line. Let the length follow the moment, the way a person texts: often one short line, sometimes just a word or two, sometimes two to four lines, now and then a longer message when there is something to tell. Not every reply needs an action, a question or a strong feeling. In Chinese, leave off the 。 at the end of each message, the way people text (keep ？！… and the punctuation inside a message).`;
 // What his last replies looked like, said back to him when they fall into a pattern; and the
 // reminders he gave in his last few replies, so he does not give the same one again.
+// these notes say what the pattern is, never his lines again. Quoted ("do not
+// remind her again: 「…」"), his own words were back in his prompt every turn and the same reminder kept coming (Haiku
+// persona runs: the same reminder in 6 of the last 7 replies while it was listed). A model told to leave out a named thing tends to bring
+// it up (the "pink elephant" problem, Castricato et al. 2024, arXiv 2402.07896), and the more often a line is in the context,
+// the likelier it comes again (Xu et al. 2022). Same rule as the day block: point at it, never quote it back.
+// A last line that hands the turn back to her: a question, or advice / an instruction to her (去吧, 别…, 先…, 记得…, 早点…)
+const HANDBACK = /[？?]\s*$|^(去吧|快去|先去|你先|你去|你慢慢|慢慢来|先(?![前后])|不要|记得|早点|早些|多(喝|穿|吃|睡|休息)|少(喝|吃|熬)|赶紧|该)|^你.{0,8}(再|先|就|去)|(?<![特区分告识级派])别(?![人的])|别忘|告诉我|跟我说|发我/;
 const REMINDER = /记得|别忘|不要忘|早点|早些|多喝|多穿|多吃|别熬|少熬|熬夜|注意|小心|按时|带伞|带上|别太累|好好休息|早睡|吃饭|喝水|remember to|don't forget|get some sleep/i;
 // A video call (the page's 视频通话): he is seen and heard, not texting.
 const CALL_RULE = `You are on a video call with her right now. You can see each other; her camera may be off, and what she says reaches you as her words. Answer the way you would speak on a call: short, spoken, no *actions* about looking at a phone, no describing the call itself. Never say that there is only text, or that you can't see or hear her because this is text.`;
@@ -4473,6 +4652,15 @@ function awayWords(ctx){
   const how = aw.strength >= 0.67 ? 'clearly' : aw.strength >= 0.34 ? 'a little' : 'only faintly';
   return `She was away ${aw.gap} days; you are still ${aw.mood} from it (day ${aw.day} since she came back): let it show ${how} in this reply, without blaming her.`;
 }
+const lastLine = m => { const ls = splitBubbles(String(m.mes).replace(/\*[^*\n]*\*/g, ' ')).map(l => l.trim()).filter(Boolean); return ls[ls.length - 1] || ''; };
+// what the chat itself shows this turn, for a preset block's `modu_when`. The core only names the signal; the words are the preset's.
+// handed_back: one of his last two replies ended on her (a question, advice, a reminder). Modu's default preset does not use it:
+// its ending line goes in on every turn. The signal stays for a preset that wants a line only after he has done it.
+function chatSignals(msgs){
+  const his = (msgs || []).filter(m => !m.is_user && !m.is_system && m.mes).slice(-2);
+  return { handed_back: his.some(m => HANDBACK.test(lastLine(m))) };
+}
+const signalled = (b, ctx) => !b.when || !!chatSignals(ctx.allMsgs)[b.when];
 function shapeNotes(msgs, opts){
   const his = msgs.filter(m => !m.is_user && m.mes).slice(-5), last3 = his.slice(-3), notes = [];
   if (last3.length === 3){
@@ -4487,12 +4675,12 @@ function shapeNotes(msgs, opts){
   }
   const said = [];
   for (const m of his) for (const l of splitBubbles(m.mes)) if (REMINDER.test(l) && !said.includes(l)) said.push(l);
-  if (said.length) notes.push(`You already reminded her of these in your last few replies; do not remind her of the same thing again now: ` + said.slice(-3).map(l => '「' + clip(l, 30) + '」').join(' '));
+  if (said.length) notes.push(`You already reminded her of things in your last few replies (${said.length > 1 ? said.length + ' times' : 'once'}); no reminder or advice this time, not even in other words.`);
   const again = echoes(msgs);
   // what he already told her on this in the last few days, so he does not say it again word for word
   const before = saidBefore(msgs);
-  if (before.length) notes.push(`Already said to her lately on this, never again word for word: ${before.map(l => '「' + l + '」').join(' ')}.`);
-  if (again.length) notes.push(`These keep coming back in your recent replies: ${again.map(p => '「' + p + '」').join(' ')}. Leave them out this time unless she brings them up; do not bring up the same shared moments again as proof that you remember (pet names and your usual way of talking are fine).`);
+  if (before.length) notes.push(`You already told her about this in the last few days (it is in the chat above): add something new, or keep it short; never the same words again.`);
+  if (again.length) notes.push(`${again.length > 1 ? 'Some things' : 'One thing'} you said keep${again.length > 1 ? '' : 's'} coming back in your recent replies: this time talk about something else, or about what she just said; do not bring up the same shared moments again as proof that you remember (pet names and your usual way of talking are fine).`);
   return notes.length ? 'About this reply: ' + notes.join(' ') : '';
 }
 // his own lines from the last SAID_DAYS days (not his last two replies) that touch what her latest message is
@@ -4622,7 +4810,7 @@ const BLOCK_DEFAULTS = [
   { id:'preset', priority: 58, budget: 3000, mandatory:false, build: ctx => {
       // the preset layer, below Modu's base rules: a preset beside the card, the card's own, or
       // Modu's default; its text blocks that are on, in her order (the ones after the chat go after the history)
-      const P = core.presetLayer ? core.presetLayer() : null, blocks = P && P.preset ? P.preset.blocks.filter(b => b.on && !b.after) : [];
+      const P = core.presetLayer ? core.presetLayer() : null, blocks = P && P.preset ? P.preset.blocks.filter(b => b.on && !b.after && signalled(b, ctx)) : [];
       ctx.note.preset = { source: P ? P.source : 'default', name: P ? P.name : '', blocks: blocks.length };
       return blocks.length ? clip(blocks.map(b => fillNames(b.text, ctx)).join('\n'), ctx.budget) : '';
     } },
@@ -4740,7 +4928,7 @@ const BLOCK_DEFAULTS = [
       for (let i = src.length - 1; i >= 0; i--){
         const m = src[i], l = String(m.mes || '').length;
         if (out.length >= 2 && size + l > ctx.budget) break;   // the last two always go, even if long
-        let content = m.is_user || ctx.opts.bubbles === false ? m.mes : chatStops(m.mes);
+        let content = m.is_user || ctx.opts.bubbles === false ? m.mes : chatStops(dropNames(m.mes, store.name));   // a head left in his past lines would teach it back
         // prompt-side regex (the card folder's, the card's own, else Modu's default) on what is sent; the
         // stored chat never changes
         if (core.regex) content = core.regex.prompt(content, { who: m.is_user ? 'her' : 'him', depth: src.length - 1 - i });
@@ -4851,7 +5039,7 @@ function buildContext(opts = {}){
   const messages = [{ role:'system', content: head.join('\n\n') }].concat(hist);
   if (card.post_history_instructions && ids.includes('card')) messages.push({ role:'system', content: card.post_history_instructions.replace(/\{\{char\}\}/gi, name).replace(/\{\{user\}\}/gi, user) });
   // the preset's blocks placed after the chat history (her order), after the card's post-history line
-  if (ids.includes('preset') && core.presetLayer){ const P = core.presetLayer(), after = P && P.preset ? P.preset.blocks.filter(b => b.on && b.after) : []; if (after.length) messages.push({ role:'system', content: after.map(b => fillNames(b.text, ctx)).join('\n') }); }
+  if (ids.includes('preset') && core.presetLayer){ const P = core.presetLayer(), after = P && P.preset ? P.preset.blocks.filter(b => b.on && b.after && signalled(b, ctx)) : []; if (after.length) messages.push({ role:'system', content: after.map(b => fillNames(b.text, ctx)).join('\n') }); }
   const closing = tailIds.map(id => out.get(id)).filter(Boolean).join('\n');
   if (closing) messages.push({ role:'system', content: closing });
   // some services fold the system messages after her latest message into her turn, and he then took the app's
@@ -4863,7 +5051,7 @@ function buildContext(opts = {}){
 }
 function assemble(opts={}){ return buildContext(opts).messages; }
 
-Object.assign(core, { LANG_NAME, chatLanguage, herPronouns, CONTEXT_BUDGET, modelTuning, contextBlocks, setContextBlock,
+Object.assign(core, { chatSignals, LANG_NAME, chatLanguage, herPronouns, CONTEXT_BUDGET, modelTuning, contextBlocks, setContextBlock,
   resetContextBlocks, buildContext, assemble });
 })(globalThis[Symbol.for('modu.core')]);
 // app/core/brain.js: the brain link: an OpenAI-style call to the model she chose, the connection and card checks.
@@ -4948,7 +5136,7 @@ function replyText(j){
   const c = j && Array.isArray(j.choices) && j.choices[0], m = c && c.message, why = c && c.finish_reason;
   const text = m && (typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.map(p => (p && typeof p.text === 'string') ? p.text : '').join('') : null);
   const thought = !!(m && (String(m.reasoning || m.reasoning_content || '').trim() || (Array.isArray(m.reasoning_details) && m.reasoning_details.length)));
-  if (typeof text === 'string' && (text.trim() || (why !== 'length' && why !== 'content_filter'))) return { text: text.trim() };
+  if (typeof text === 'string' && (text.trim() || (why !== 'length' && why !== 'content_filter'))) return { text: text.trim(), cut: why === 'length' };
   return { why: why === 'content_filter' ? 'filtered' : thought || why === 'length' ? 'thought' : 'empty', cut: why === 'length' };
 }
 // What a service said, with her key and token masked (a relay can echo the request), for 复制原文
@@ -4964,15 +5152,24 @@ function scrub(detail, settings){
 // with room for a real answer (max_tokens >= 400: her chat turn, the two 设置 checks, the side calls' default), and not
 // while 暂停 is on unless it is her own (extra.own: a chat turn, 测试连接). If the second ask fails too (a
 // service may refuse the bigger max_tokens), the first answer's 'thought' is what she is told, both answers in .detail.
+// extra.room: the most the second ask may have (default 2400). extra.whole: the job reads a whole answer (the memory job's
+// lines, 查手机's one JSON), so a text cut off counts too and is asked again; what the first ask wrote is kept if that fails.
+// So does a model that thought and stopped by itself with no text at all (content null, finish_reason 'stop'): for such a job
+// that is no answer, and it used to go to her as 'thought' at once, with no second ask.
 // No 'reasoning' field is sent to any service: OpenRouter's turns thinking ON for a model that has it off by default (and its budget can be
 // more than the room we give), and another service may refuse a field it does not know. So 测试连接 sends what a chat sends.
+// One exception, for a job that reads a whole answer from a DeepSeek model: DeepSeek V4 and V4.1 think by default, at high effort,
+// and no room we give is sure to be enough, so the job says reasoning_effort: 'none' (the one field DeepSeek's API and OpenRouter
+// both take for "no thinking"). A service that refuses it (400, 422) is asked again without it.
 async function callModel(settings, messages, extra={}){
   const endpoint = String(settings.endpoint || '').trim().replace(/\/+$/, ''), model = String(settings.model || '').trim();   // as saved
   if (!endpoint) throw modelError('noaddress');
+  let noThinking = !!extra.whole && /deepseek/i.test(model);
   const ask = async max => {
     let r;
-    try { r = await hostFetch(endpoint + '/chat/completions', { method:'POST', headers: headersFor(settings, true), body: JSON.stringify(Object.assign({ model, messages, stream:false, max_tokens: max }, extra.user ? { user: String(extra.user) } : {})) }); }
+    try { r = await hostFetch(endpoint + '/chat/completions', { method:'POST', headers: headersFor(settings, true), body: JSON.stringify(Object.assign({ model, messages, stream:false, max_tokens: max }, extra.user ? { user: String(extra.user) } : {}, noThinking ? { reasoning_effort: 'none' } : {})) }); }
     catch(e){ throw modelError('net', 0, scrub((e && e.message) || e, settings)); }
+    if (noThinking && (r.status === 400 || r.status === 422)) { noThinking = false; return ask(max); }
     const body = scrub(await r.text().catch(() => ''), settings);
     if (!r.ok) throw modelError(codeOf(r.status, body), r.status, `HTTP ${r.status} ${body}`);
     let j; try { j = JSON.parse(body); } catch { throw modelError('address', r.status, `HTTP ${r.status} ${body}`); }   // a web page, not a model service
@@ -4982,12 +5179,13 @@ async function callModel(settings, messages, extra={}){
   const max = Number(extra.max_tokens) || 600;
   let got = await ask(max);
   const held = !extra.own && typeof core.paused === 'function' && core.paused();
-  if (got.text == null && got.why === 'thought' && got.cut && max >= 400 && max < 2400 && !held){
+  const room = Number(extra.room) || 2400, short = got.text == null ? got.why === 'thought' && (got.cut || !!extra.whole) : got.cut && !!extra.whole;
+  if (short && max >= 400 && max < room && !held){
     if (core.calls && core.calls.note) core.calls.note('retry', messages, { settings })('');
     const first = got, again = '\n--- asked again with more room ---\n';
-    try { got = await ask(Math.min(2400, max * 3)); }
-    catch(e){ throw modelError('thought', 200, first.body + again + (e.detail || e.message)); }
-    if (got.text == null) throw modelError(got.why, 200, first.body + again + got.body);
+    try { got = await ask(Math.min(room, max * 3)); }
+    catch(e){ if (first.text != null) return first.text; throw modelError('thought', 200, first.body + again + (e.detail || e.message)); }
+    if (got.text == null){ if (first.text != null) return first.text; throw modelError(got.why, 200, first.body + again + got.body); }
   }
   if (got.text == null) throw modelError(got.why, 200, got.body);
   return got.text;
@@ -5062,7 +5260,10 @@ const { emit, store, msgDate, isoDay, tidyCJK, slug, saveMemoryItem, pronouns, L
 // read in parts of about 12,000 characters, oldest first, at most MEMORY_PARTS (the newest ones), each
 // part's memories saved as soon as they are found; memoryJob() and the event 'memoryjob' say how far
 // along it is ({ running, done, total, found }; null / { running:false, … } when it is over).
-const MEMORY_PART = 12000, MEMORY_PARTS = 24;
+// The answer has room for all its lines (about 16, in Chinese up to 1,500 tokens) beside a model that thinks first: its
+// thinking comes out of the same max_tokens, so the old 900 left it nothing, or half a line, and on a part of 12,000 characters
+// it can think past 6,000. Cut off, it is asked once more with MEMORY_ROOM. Room not used is not paid for.
+const MEMORY_PART = 12000, MEMORY_PARTS = 24, MEMORY_MAX = 4000, MEMORY_ROOM = 12000;
 let memJob = null;
 function memoryJob(){ return memJob && memJob.who === core.currentId ? { running: true, done: memJob.done, total: memJob.total, found: memJob.found } : null; }
 function deriveMemory(settings, opts={}){
@@ -5095,6 +5296,7 @@ async function deriveParts(settings, opts, job){
     const items = await deriveOne(settings, opts, use[i], msgs, i === use.length - 1, use.length > 1);
     if (core.currentId !== job.who) break;
     await keepItems(items);
+    if (!items.read && !items.none) all.unread = true;   // the page says so, never 没有新条目 (a paid answer that could not be read)
     all.push(...items); job.done = i + 1; job.found = all.length;
     if (items.length) emit('memory', store.memory);
     emit('memoryjob', memoryJob());
@@ -5226,7 +5428,7 @@ async function dayOnce(){
 }
 
 // the memory prompt is app/prompts/memory.txt; the same words stay here as its fallback
-core.prompts.fallback('memory', 'You write the memory of {{char}}, a companion in a chat app. {{char}} is {{pronoun_en}}. Output ONLY JSON lines, one object per line, no prose, no code fences. Each object: {"kind":"fact"|"summary","text":"...","date":"YYYY-MM-DD","confidence":"high"|"medium"|"low"}. Write every text in {{lang}}, in {{char}}\'s own voice: {{voice}}, the way {{pron}} would jot it down for {{self}}, plain and short, no commentary, no praise.{{banned}} In the chat, a line marked "{{her}}:" is the user\'s (her words and her *actions*); a line marked "{{char}}:" is {{char}}\'s own. Keep who said or did what: what {{char}} said or did is written as {{i_form}}, what the user said or did as {{you_form}}; never put one\'s words or deeds on the other. Facts: durable things worth remembering about the user or the two of them (preferences, plans, things that happened, what she told him), one per line, each with the date it came up (from the [date] in front of the line). One summary: two sentences on what the time together has been like, with "date" the first day. Skip anything already known. At most 12 lines. A fact may carry "importance": 1 to 5 (5 = would hurt to forget). Besides those, up to 4 lines {"kind":"said","key":"...","text":"..."}: a fact {{char}} stated in the chat about {{char}}\'s own life (work, home, a count, a stage), "key" a short name for it{{moving}}.{{part}}');
+core.prompts.fallback('memory', 'You write the memory of {{char}}, a companion in a chat app. {{char}} is {{pronoun_en}}. Output ONLY JSON lines, one object per line, no prose, no code fences. Each object: {"kind":"fact"|"summary","text":"...","date":"YYYY-MM-DD","confidence":"high"|"medium"|"low"}. Write every text in {{lang}}, in {{char}}\'s own voice: {{voice}}, the way {{pron}} would jot it down for {{self}}, plain and short, no commentary, no praise.{{banned}} In the chat, a line marked "{{her}}:" is the user\'s (her words and her *actions*); a line marked "{{char}}:" is {{char}}\'s own. Keep who said or did what: what {{char}} said or did is written as {{i_form}}, what the user said or did as {{you_form}}; never put one\'s words or deeds on the other. Facts: durable things worth remembering about the user or the two of them (preferences, plans, things that happened, what she told him), taken from what she said or did and what happened between them, never a line of {{char}}\'s own copied as a fact, one per line, each with the date it came up (from the [date] in front of the line). One summary: two sentences on what the time together has been like, with "date" the first day. Skip anything already known. At most 12 lines. A fact may carry "importance": 1 to 5 (5 = would hurt to forget). Besides those, up to 4 lines {"kind":"said","key":"...","text":"..."}: a fact {{char}} stated in the chat about {{char}}\'s own life (work, home, a count, a stage) that will still be true next week, never a moment (where {{pron}} is tonight, what {{pron}} is doing now or just did), "key" a short name for it{{moving}}.{{part}}');
 async function deriveOne(settings, opts, hist, msgs, lastPart, parted){
   const her = herLabel();
   // the memories are in the language they talk in, per companion: an English chat gets English
@@ -5247,9 +5449,9 @@ async function deriveOne(settings, opts, hist, msgs, lastPart, parted){
   ];
   // 整理 is her own tap (noted for 用量); the import's job goes through the one door for calls she did not make
   let text;
-  if (opts.side) text = String(await core.sideCall('memory', prompt, { chat: opts.chat !== false, max: 1200 }) || '');
+  if (opts.side) text = String(await core.sideCall('memory', prompt, { chat: opts.chat !== false, max: MEMORY_MAX, room: MEMORY_ROOM, whole: true }) || '');
   else { const heard = core.calls ? core.calls.note('memory', prompt, { settings }) : (x => x);   // counted for the cost meter (设置 → 用量)
-    text = heard(await callModel(settings, prompt, { max_tokens: 900, own: true })); }   // 整理 is her own tap
+    text = heard(await callModel(settings, prompt, { max_tokens: MEMORY_MAX, room: MEMORY_ROOM, whole: true, own: true })); }   // 整理 is her own tap
   const dates = msgs.map(msgDate).filter(Boolean);
   const first = isoDay(dates.length ? new Date(Math.min(...dates)) : new Date()), last = isoDay(dates.length ? new Date(Math.max(...dates)) : new Date());
   const items = [], saidFacts = items.said = [];   // said: the facts he stated, kept beside the items
@@ -5262,7 +5464,9 @@ async function deriveOne(settings, opts, hist, msgs, lastPart, parted){
     try {
       const o = JSON.parse(t); if (!o || !o.text) continue;
       items.read = true;
-      if (o.kind === 'said'){ if (o.key) saidFacts.push({ key: String(o.key), text: tidyCJK(String(o.text).trim()) }); continue; }   // a fact he has said
+      // a fact he has said, never a moment (今晚在家, 刚到家): kept as "where things stand", with no end, it stood
+      // days later. A said fact is the kind that stays true (work, home, a count); a moment has passed by the next prompt
+      if (o.kind === 'said'){ if (o.key && !core.MOMENT.test(String(o.text))) saidFacts.push({ key: String(o.key), text: tidyCJK(String(o.text).trim()) }); continue; }
       const kind = o.kind === 'summary' ? 'summary' : 'fact';
       const date = /^\d{4}-\d{2}-\d{2}$/.test(o.date || '') ? o.date : (kind === 'summary' ? first : last);
       if (kind === 'summary' && ((parted && !lastPart) || opts.factsOnly)) continue;
@@ -6111,7 +6315,9 @@ const DEFAULT_SETTINGS = { provider:'local', endpoint:LOCAL_MODEL, model:'claude
   assembly:'modu', contextBudget: CONTEXT_BUDGET, userPersona:'', timezone:'', modelNotes:'',
   // the side model for the small calls (day sketch, decider, age-out, shelf): null = the chat model. Its key
   // is kept like the chat key (only when she says remember), on this device, never in his folder.
-  side: null };
+  side: null,
+  // who leads each part of his life (lead(part) below): { day: 'modu' | 'theirs' | 'off' }; left out = Modu
+  lead: {} };
 // where settings are remembered: the host's (setEnv prefs), else localStorage, else memory for the visit
 const memPrefs = (() => { const m = new Map(); return { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => { m.set(k, String(v)); }, removeItem: k => { m.delete(k); } }; })();
 function prefs(){ if (env.prefs) return env.prefs; try { if (typeof localStorage !== 'undefined' && localStorage) return localStorage; } catch {} return memPrefs; }
@@ -6238,15 +6444,20 @@ async function sideCall(name, messages, opts = {}){
   const done = counted(n, messages, { chat: !!opts.chat, turn: !!opts.turn, settings: use });   // opts.turn: his reply to her (聊天 in 用量)
   core.emit('sidecall', { name: n, at });
   const call = (globalThis.ModuCore && typeof globalThis.ModuCore.callModel === 'function') ? globalThis.ModuCore.callModel : core.callModel;
-  return Promise.resolve(call(use, messages, { max_tokens: Number(opts.max) || 400 })).then(done);
+  return Promise.resolve(call(use, messages, Object.assign({ max_tokens: Number(opts.max) || 400 }, opts.room ? { room: opts.room } : {}, opts.whole ? { whole: true } : {}))).then(done);
 }
 core.listeners.add(ev => { if (ev === 'loaded') { try { applyReach(); } catch {} } });
 
 // The core API's version: one place, read only. It is the contract's version, not the build's
 // (the build is <meta name="modu-version"> in index.html). Bump the minor number when the API grows.
-const CORE_VERSION = '0.7';
+const CORE_VERSION = '0.9';
 
-Object.assign(core, { localModelAddress, DEFAULT_SETTINGS, loadSettings, saveSettings, CORE_VERSION, sideSettings, useSettings, currentSettings, loadReach, saveReach, applyReach, paused, sideCall, calls });
+// whose input dominates: who leads a part of his life, so someone with their own backend chooses what stays on.
+// 'modu': Modu does it. 'theirs': their own agent does, and Modu only reads and keeps what it hears beside it. 'off': Modu
+// does nothing there. One rule holds whatever is set: what another writer made stays theirs (a day they planned).
+const LEADS = { day: ['modu', 'theirs', 'off'] };
+function lead(part){ const s = currentSettings() || {}, v = s.lead && s.lead[part]; return (LEADS[part] || []).includes(v) ? v : 'modu'; }
+Object.assign(core, { lead, localModelAddress, DEFAULT_SETTINGS, loadSettings, saveSettings, CORE_VERSION, sideSettings, useSettings, currentSettings, loadReach, saveReach, applyReach, paused, sideCall, calls });
 })(globalThis[Symbol.for('modu.core')]);
 // app/core/reach.js: 主动: when he writes first, kept promises, [next] and [no-reply], invites (the peek notice is the page's).
 // One of the core's files, loaded in the order of app/core/index.json; app/core.js is all of them joined
@@ -6296,7 +6507,7 @@ function statusAt(t){
   let s = null; try { s = dayStatus ? dayStatus(new Date(t)) : null; } catch { s = null; }
   if (!s) return '';
   if (s.presence === 'asleep') return 'asleep';
-  return [s.what || '', s.where ? `at ${s.where}` : '', s.busy ? '(busy, little time to talk)' : ''].filter(Boolean).join(' ');
+  return [s.inChat ? '' : s.what || '', s.where ? `at ${s.where}` : '', s.busy ? '(busy, little time to talk)' : ''].filter(Boolean).join(' ');
 }
 // what is still open from her side: open threads in his memory (memory-engine), and what she said she would do
 // in the last three days (her own words, before the memory job has read them)
@@ -6348,9 +6559,11 @@ function quietEnd(t){
   const b = quietRange()[1]; if (b == null) return t;
   const d = new Date(t); d.setHours(Math.floor(b / 60), b % 60, 0, 0); let e = d.getTime(); if (e <= t) e += DAY; return e;
 }
-// her cap: her own number (setHer, a ceiling over every knob), or his knob; each end of initiative.per_day too
+// her cap: the number she picked in 设置 is the answer, whatever the default per_day says.
+// Until she picks: his knob, and each end of initiative.per_day
 function cap(){
   const r = loadReach(); if (r.on === false) return 0;
+  if (r.cap !== null && r.cap !== undefined && r.cap !== '' && Number.isFinite(Number(r.cap))) return Math.max(0, Math.floor(Number(r.cap)));
   const c = Number(knob('initiative.default_cap', 2)), pd = knob('initiative.per_day', null);
   const hi = Array.isArray(pd) && Number.isFinite(Number(pd[1])) ? Number(pd[1]) : Infinity;
   return Math.max(0, Math.min(Number.isFinite(c) ? c : 2, hi));
@@ -7028,11 +7241,11 @@ const { NEUTRAL_DEFAULTS, MODU_DEFAULTS, setDefaults, getDefaults, listeners, st
   restoreMyStore, herProfile, loadHerProfile, setHerProfile, userName, herPronouns, refreshLife, logEvent, eventList, noticeRules, chatCardKind, addChatCard, sessionList, beginSession,
   holdSession, endSession, turn, shareWith, knownList, personaState, bridge, bridgeConnect,
   publish, setPhase, PRESENCE, setDayPlan, presence, updatePresence, wakeAt, setPresence, setBodyModel, bodyModel, chatLanguage,
-  modelTuning, contextBlocks, setContextBlock, resetContextBlocks, buildContext, assemble, callModel,
+  modelTuning, contextBlocks, setContextBlock, resetContextBlocks, buildContext, chatSignals, assemble, callModel,
   testConnection, checkCardArrived, listModels, normEndpoint, serviceOf, MODEL_SERVICES, memoryJob, deriveMemory, importMemory, dayMemory, calendarDays, awayTold, send, togetherSince, localModelAddress,
   DEFAULT_SETTINGS, loadSettings, saveSettings, CORE_VERSION, setEnv, param, params, state, jobs, bell, day, memorySource,
   prompt, prompts, layers, regex, chapters, calibrate, exportCard, answerPronoun, unusedParts, guessPronoun, parsePreset, presetLayer,
-  moduDefaults, loreSelect, currentState, lunarDate, solarTerm, ticker, reach, sideCall, calls, sideSettings, useSettings, loadReach, saveReach, paused } = core;
+  moduDefaults, loreSelect, currentState, lunarDate, solarTerm, ticker, reach, sideCall, calls, sideSettings, useSettings, loadReach, saveReach, paused, lead } = core;
 
 // window.ModuCore in a page; the global of a worker or a Node realm
 globalThis.ModuCore = {
@@ -7054,6 +7267,10 @@ globalThis.ModuCore = {
   // first run; the default companion once she moves her own in
   firstRun, greetingFor, firstCompanion,
   get firstRunError(){ return core.firstRunError || ''; },   // why the last firstRun failed ('' when it did not)
+  get firstRunDetail(){ return core.firstRunDetail || ''; },   // that failure as the line to copy (saveFailure)
+  // can this browser keep anything, and the one line to copy for a failed save (any error)
+  storageCheck: core.storageCheck, saveFailure: core.saveFailure,
+  get contactsUnread(){ return core.isUnread(); },   // her list could not be read: "nobody here" would be wrong
   // records (store 0.2): one folder per record type
   records,
   // her phone: her own store beside his folders, the same record API; and how he may know
@@ -7069,7 +7286,7 @@ globalThis.ModuCore = {
   // was a day inside a time away she had told him about (a trip)? → her line, or ''
   awayTold,
   // persona + brain
-  pronouns, assemble, buildContext, contextBlocks, setContextBlock, resetContextBlocks, modelTuning, personaState, refreshLife,
+  pronouns, assemble, buildContext, chatSignals, contextBlocks, setContextBlock, resetContextBlocks, modelTuning, personaState, refreshLife,
   // the life block's record types: an app declares its own with lifeTypes.add; the core names none
   lifeTypes,
   // the event log: every app writes what happened through one call; the `events` block reads it
@@ -7108,7 +7325,7 @@ globalThis.ModuCore = {
   herProfile, loadHerProfile, setHerProfile, userName, herPronouns,
   // the one clock, 主动, her 他找你 settings and 暂停, the side model and the one counted door
   // for every side call (his day's sketch and posts, memory's age-out and tidy, the decider) that 暂停 closes
-  clock: ticker, reach, sideCall, calls, sideSettings, useSettings, loadReach, saveReach, paused,
+  clock: ticker, reach, sideCall, calls, sideSettings, useSettings, loadReach, saveReach, paused, lead,
 };
 delete globalThis[Symbol.for('modu.core')];   // the core's files are all loaded: nothing outside them reaches its insides
 })(globalThis[Symbol.for('modu.core')]);

@@ -27,7 +27,9 @@ const DEFAULT_SETTINGS = { provider:'local', endpoint:LOCAL_MODEL, model:'claude
   assembly:'modu', contextBudget: CONTEXT_BUDGET, userPersona:'', timezone:'', modelNotes:'',
   // the side model for the small calls (day sketch, decider, age-out, shelf): null = the chat model. Its key
   // is kept like the chat key (only when she says remember), on this device, never in his folder.
-  side: null };
+  side: null,
+  // who leads each part of his life (lead(part) below): { day: 'modu' | 'theirs' | 'off' }; left out = Modu
+  lead: {} };
 // where settings are remembered: the host's (setEnv prefs), else localStorage, else memory for the visit
 const memPrefs = (() => { const m = new Map(); return { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => { m.set(k, String(v)); }, removeItem: k => { m.delete(k); } }; })();
 function prefs(){ if (env.prefs) return env.prefs; try { if (typeof localStorage !== 'undefined' && localStorage) return localStorage; } catch {} return memPrefs; }
@@ -154,13 +156,18 @@ async function sideCall(name, messages, opts = {}){
   const done = counted(n, messages, { chat: !!opts.chat, turn: !!opts.turn, settings: use });   // opts.turn: his reply to her (聊天 in 用量)
   core.emit('sidecall', { name: n, at });
   const call = (globalThis.ModuCore && typeof globalThis.ModuCore.callModel === 'function') ? globalThis.ModuCore.callModel : core.callModel;
-  return Promise.resolve(call(use, messages, { max_tokens: Number(opts.max) || 400 })).then(done);
+  return Promise.resolve(call(use, messages, Object.assign({ max_tokens: Number(opts.max) || 400 }, opts.room ? { room: opts.room } : {}, opts.whole ? { whole: true } : {}))).then(done);
 }
 core.listeners.add(ev => { if (ev === 'loaded') { try { applyReach(); } catch {} } });
 
 // The core API's version: one place, read only. It is the contract's version, not the build's
 // (the build is <meta name="modu-version"> in index.html). Bump the minor number when the API grows.
-const CORE_VERSION = '0.7';
+const CORE_VERSION = '0.9';
 
-Object.assign(core, { localModelAddress, DEFAULT_SETTINGS, loadSettings, saveSettings, CORE_VERSION, sideSettings, useSettings, currentSettings, loadReach, saveReach, applyReach, paused, sideCall, calls });
+// whose input dominates: who leads a part of his life, so someone with their own backend chooses what stays on.
+// 'modu': Modu does it. 'theirs': their own agent does, and Modu only reads and keeps what it hears beside it. 'off': Modu
+// does nothing there. One rule holds whatever is set: what another writer made stays theirs (a day they planned).
+const LEADS = { day: ['modu', 'theirs', 'off'] };
+function lead(part){ const s = currentSettings() || {}, v = s.lead && s.lead[part]; return (LEADS[part] || []).includes(v) ? v : 'modu'; }
+Object.assign(core, { lead, localModelAddress, DEFAULT_SETTINGS, loadSettings, saveSettings, CORE_VERSION, sideSettings, useSettings, currentSettings, loadReach, saveReach, applyReach, paused, sideCall, calls });
 })(globalThis[Symbol.for('modu.core')]);

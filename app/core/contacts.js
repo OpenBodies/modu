@@ -3,7 +3,7 @@
 // (python -I app/core/join.py). A name from another core file is `core.name` (or taken at the top).
 (function(core){
 'use strict';
-const { emit, store, env, hostFetch, msgDate, storage, kvSet, kvGet, VDir, phoneRoot, stageImport, saveImport, resetStore,
+const { emit, store, env, hostFetch, msgDate, storage, storageError, saveFailure, kvSet, kvGet, VDir, phoneRoot, stageImport, saveImport, resetStore,
   loadFromDir, readText, SAVING, savingNote, saveLock, parseChat } = core;
 
 // --- Contacts: every companion this browser knows, newest first ----------------------------------
@@ -27,7 +27,15 @@ async function loadContacts(){
   if (!recovering) recovering = read().then(ok => ok ? recoverSaves().then(async back => { await finishRemovals(); return back; }) : []).catch(e => console.error('recover:', e));
   await recovering;
   await read();
+  await markMissing();
   return core.contacts;
+}
+// A contact in the in-browser folder with neither card nor chat there: said on his row (filesMissing, for this visit, never
+// saved) and when she taps him. Her list is not changed: a companion leaves only on her own yes.
+async function markMissing(){
+  if (unread) return;
+  let has; try { has = new Set((await storage().keys('vfs', 'modu/')).map(String)); } catch(e){ console.error(e); return; }
+  for (const c of core.contacts) if (c.where === 'phone' && c.vpath) c.filesMissing = !has.has(c.vpath + '/card.json') && !has.has(c.vpath + '/chat.jsonl');
 }
 let unread = false;   // true after her list could not be read: saveContacts writes nothing over it until a read works
 // Once a visit, before anyone reads the contacts: a save a closed tab cut off is never left hidden.
@@ -120,12 +128,20 @@ async function usedBy(c){
   if (!msgs && c.vpath){ try { msgs = parseChat(await readText(new VDir(c.vpath), 'chat.jsonl') || '').msgs; } catch { msgs = []; } }
   return (msgs || []).some(m => m && m.is_user);
 }
+// → false when the list could not be kept. Said once, not at every message; a save it failed for has its folder and
+// its note, so the next start gives him back (recoverSaves).
+let listRefused = false;
 async function saveContacts(){
-  if (core.ephemeral || unread) return;
+  if (core.ephemeral || unread) return true;
   try {
-    await kvSet('contacts', core.contacts.filter(c => c.where !== 'demo').map(c => { const o = Object.assign({}, c); delete o.snap; return o; }));
+    await kvSet('contacts', core.contacts.filter(c => c.where !== 'demo').map(c => { const o = Object.assign({}, c); delete o.snap; delete o.filesMissing; return o; }));
     await kvSet('currentId', core.currentId);
-  } catch(e){ console.error(e); }
+    listRefused = false; return true;
+  } catch(e){
+    console.error(e);
+    if (!listRefused){ listRefused = true; emit('error', '联系人名单没存上，下次打开时会再放回去：' + saveFailure(storageError(e, 'list'))); }
+    return false;
+  }
 }
 // a contact's small picture: the host's own (setEnv thumb), else a canvas; with no document (a backend), none
 // a tall picture is cut toward its top (where the face is), as the round .av shows it (center 22%)
@@ -181,7 +197,13 @@ async function openContact(id){
   if (c.where === 'demo'){ if (!c.snap) return false; resetStore(); Object.assign(store, c.snap); core.currentId = c.id; emit('loaded', store); return true; }
   const dir = c.where === 'phone' ? new VDir(c.vpath) : c.dir;
   if (c.where === 'folder' && (await dir.queryPermission({ mode:'readwrite' })) !== 'granted' && (await dir.requestPermission({ mode:'readwrite' })) !== 'granted') return false;
-  await loadFromDir(dir); return true;
+  try { await loadFromDir(dir); }
+  catch(e){
+    if (c.where !== 'phone' || (e && e.code) !== 'no-companion') throw e;
+    c.filesMissing = true; emit('contacts', core.contacts);
+    throw Object.assign(new Error(`${c.name}的资料不在这部手机上了，打不开。有备份的话可以从备份恢复；也可以长按把这一行删掉`), { code: 'files-missing', cause: e });
+  }
+  return true;
 }
 async function canOpenWithoutAsking(c){
   if (!c) return false; if (c.where === 'phone') return true; if (c.where !== 'folder') return false;
@@ -211,24 +233,36 @@ async function removeContact(id, opts = {}){
 // never brings him back. The demo (ephemeral) never seeds.
 // char_zh.png in Chinese mode, char_en.png with { lang:'en' }.
 const FIRST_COMPANION = { zh: 'char_zh.png', en: 'char_en.png' };
-// a first run that failed leaves its reason in core.firstRunError ('' when it did not fail), so 搬家 can say it
-// instead of opening with nobody and no word why
-core.firstRunError = '';
+// a first run that failed leaves its reason in core.firstRunError ('' when it did not fail) and the line to copy in
+// core.firstRunDetail, so the phone can say it instead of opening with nobody and no word why
+core.firstRunError = ''; core.firstRunDetail = '';
+// somebody she could open in the in-browser folder. A folder with no card and no chat, or one a failed save left (not
+// 'saved'), is nobody: counting it wrote the firstRun note and left a phone empty for good
+async function someoneInFolder(){
+  const keys = (await storage().keys('vfs', 'modu/')).map(String).filter(k => k.startsWith('modu/')), has = new Set(keys);
+  for (const n of new Set(keys.map(k => k.split('/')[1]))){
+    const path = 'modu/' + n;
+    if (!has.has(path + '/card.json') && !has.has(path + '/chat.jsonl')) continue;
+    const note = has.has(path + '/' + SAVING) ? await savingNote(new VDir(path)) : null;
+    if (!note || note.state === 'saved') return true;
+  }
+  return false;
+}
 async function firstRun(base = '../samples/', { lang = 'zh' } = {}){
   const first = FIRST_COMPANION[lang] || FIRST_COMPANION.zh;
   if (core.ephemeral) return null;
-  core.firstRunError = '';
+  core.firstRunError = ''; core.firstRunDetail = '';
   try {
     { const note = await kvGet('firstRun'); if (note){ await newSeedPicture(base, note); return null; } }
     await loadContacts();
-    const someone = async () => core.contacts.length || ((await kvGet('contacts')) || []).length || (await storage().keys('vfs', 'modu/')).some(k => String(k).startsWith('modu/'));
+    const someone = async () => core.contacts.length || ((await kvGet('contacts')) || []).length || await someoneInFolder();
     if (await someone()){
       // the default companion saved, then the tab closed before this note: he is still the one firstRun seeded
       let seeded = null;
       for (const c of core.contacts) if (!seeded && c.where === 'phone' && c.vpath){ try { if (JSON.parse(await readText(new VDir(c.vpath), 'manifest.json') || 'null').seeded) seeded = c; } catch {} }
       await kvSet('firstRun', seeded ? { at: core.now().getTime(), seeded: seeded.name, id: seeded.id } : { at: core.now().getTime(), seeded:'' }); return null;
     }
-    const r = await hostFetch(base + first); if (!r.ok) throw new Error(r.status);
+    const r = await hostFetch(base + first); if (!r.ok) throw Object.assign(new Error(r.status), { step: 'fetch', file: first });
     const st = await stageImport([new File([await r.blob()], first, { type:'image/png' })]);
     st.seeded = true;   // put here by Modu, not brought by her: no "he just arrived" (seam presence)
     // looked at again inside the save lock, so a companion she is moving in at this moment (another tab, or 搬家
@@ -241,7 +275,7 @@ async function firstRun(base = '../samples/', { lang = 'zh' } = {}){
       return true;
     });
     return seeded ? current() : null;
-  } catch(e){ console.error('first run:', e); core.firstRunError = String((e && (e.message || e.name)) || e || '?').slice(0, 200); return null; }   // tried again next time
+  } catch(e){ console.error('first run:', e); core.firstRunError = String((e && (e.message || e.name)) || e || '?').slice(0, 200); core.firstRunDetail = saveFailure(e); return null; }   // tried again next time
 }
 // The default companion's old picture (a flat dark cap, read as a 锅盖头) was seeded once, so a phone that has
 // him keeps it. Once, at a later firstRun: the companion firstRun seeded, still in her in-browser folder, whose picture is
@@ -292,5 +326,6 @@ async function firstCompanion(o = {}){
 }
 
 Object.assign(core, { loadContacts, saveContacts, thumb, touch, stash, current, register, openContact,
-  canOpenWithoutAsking, removeContact, firstRun, firstCompanion, recoverSaves, addContact, planRemoval, finishRemovals });
+  canOpenWithoutAsking, removeContact, firstRun, firstCompanion, recoverSaves, addContact, planRemoval, finishRemovals,
+  isUnread: () => unread });
 })(globalThis[Symbol.for('modu.core')]);

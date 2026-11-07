@@ -12,7 +12,11 @@ function loreEntries(book){
   if (!book) return [];
   const raw = Array.isArray(book.entries) ? book.entries : Object.values(book.entries || {});
   return raw.filter(e => e && typeof e.content === 'string' && e.content.trim()).map((e, i) => {
-    const x = e.extensions || {}, pick = k => x[k] !== undefined ? x[k] : e[k];
+    // a V2 character_book keeps these in `extensions` in snake_case (prevent_recursion, group_override, use_probability),
+    // a world-info file on the entry in camelCase. Only camelCase was read, so a traded card's recursion, group and chance
+    // settings were silently ignored: an author's "prevent recursion" on every entry still recursed. Both names now
+    const snake = k => k.replace(/[A-Z]/g, c => '_' + c.toLowerCase());
+    const x = e.extensions || {}, pick = k => [x[k], x[snake(k)], e[k], e[snake(k)]].find(v => v !== undefined);
     const pos = pick('position');   // 0 before char, 1 after, 4 at depth; or 'before_char' / 'after_char'
     const keys = [].concat(e.keys || e.key || []).map(String).map(s => s.trim()).filter(Boolean);
     const sec = [].concat(e.secondary_keys || e.keysecondary || []).map(String).map(s => s.trim()).filter(Boolean);

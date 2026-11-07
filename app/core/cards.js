@@ -182,6 +182,7 @@ function readJsonReply(raw){
   try { const o = JSON.parse(s.slice(a, b + 1)); return o && typeof o === 'object' && !Array.isArray(o) ? o : null; } catch { return null; }
 }
 const KNOB_GROUPS = Object.keys(core.DEFAULT_PARAMS || {});
+const CAL_MAX = 6000;   // the answer's room: the whole params file in Chinese, with room for a model that thinks first
 let calibrating = null, calibrateLater = false; const calibratedHashes = new Set();
 core.calibrations = 0;   // how many calibration calls were made in this visit (the cost meter, the tests)
 // A calibration belongs to the companion open when it was asked for. It first waits for his
@@ -231,7 +232,10 @@ async function calibrateFor(key, settings, o){
   // one attempt per card and model, kept as a record (calibration/last.json): a model that fails or refuses is not asked
   // again each time the app opens; a new model, or force, asks again
   let last = null; try { last = await recs.get('calibration', 'last'); } catch {}
-  if (!o.force && last && last.hash === hash && last.model === String(s.model || '')) return { ran: false, ok: false, why: 'tried' };
+  // an answer cut off by a smaller room (2500; a long card needs ~4000 characters of JSON, and a model that thinks
+  // first spends some of it there) is asked once more with the room it needs: a record without max is from before that
+  const cutOff = last && last.why === 'unusable' && (Number(last.max) || 2500) < CAL_MAX;
+  if (!o.force && last && last.hash === hash && last.model === String(s.model || '') && !cutOff) return { ran: false, ok: false, why: 'tried' };
   if (!dir && !here()) return { ran: false, ok: false, why: 'switched' };   // no folder of his to keep it in: not asked
   // → '' when the answer may be written now, else why it is let go (see above)
   const blocked = async () => {
@@ -242,10 +246,10 @@ async function calibrateFor(key, settings, o){
     for (const f of ['params.her.json', 'params.json']){ const pj = await json(f); if (pj && typeof pj === 'object' && pj.writer !== 'calibration') return 'hand'; }
     return '';
   };
-  const tried = async why => { if (await blocked()) return; try { await recs.commit('calibration', { id: 'last', hash, model: String(s.model || ''), why, at: now().getTime() }, { writer: 'calibration', app: 'calibration' }); } catch {} };
+  const tried = async why => { if (await blocked()) return; try { await recs.commit('calibration', { id: 'last', hash, model: String(s.model || ''), why, max: CAL_MAX, at: now().getTime() }, { writer: 'calibration', app: 'calibration' }); } catch {} };
   const asked = [{ role: 'system', content: text || cardDigest(card) }, { role: 'user', content: cardDigest(card) }];
   calibratedHashes.add(hash); core.calibrations++;
-  let raw; try { raw = await core.sideCall('calibrate', asked, { chat: true, settings: s, max: 2500 }); }
+  let raw; try { raw = await core.sideCall('calibrate', asked, { chat: true, settings: s, max: CAL_MAX }); }
   catch(e){ if (e && e.code === 'paused'){ calibratedHashes.delete(hash); core.calibrations--; calibrateLater = true; return { ran: false, ok: false, why: 'paused' }; }
     await tried('failed'); return { ran: true, ok: false, why: 'failed' }; }
   const got = readJsonReply(raw);
@@ -334,8 +338,12 @@ function cardFacts(){
 }
 // → the lines of the current state: { fixed: [text], now: [{ key, value, from: 'said' | 'card' }] }: what he has said wins
 // over the card for a fact memory owns; a fact a state key or counter owns keeps the card's words here
+// a said fact that is a moment (core.MOMENT, memory.js) ends with its day, as state with an end does elsewhere (a plan or a
+// place that is over is closed, never left standing)
+const passed = r => core.MOMENT.test(String(r.value || '')) && core.isoDay(new Date(Number(r.said_at || r.at) || 0)) < core.isoDay(now());
 function currentState(){
-  const f = cardFacts(), said = core.factsNow.key === cardKey() ? core.factsNow.said : {};
+  const f = cardFacts(), all = core.factsNow.key === cardKey() ? core.factsNow.said : {}, said = {};
+  for (const k of Object.keys(all)) if (!passed(all[k])) said[k] = all[k];
   const now2 = f.moving.map(m => { const r = m.owner === 'memory' ? said[m.id] : null; return r && r.value != null && String(r.value).trim() ? { key: m.id, value: String(r.value), from: 'said' } : { key: m.id, value: m.card_says, from: 'card' }; }).filter(x => x.value);
   for (const k of Object.keys(said)) if (!f.moving.some(m => m.id === k) && said[k].value != null && String(said[k].value).trim()) now2.push({ key: String(said[k].key || k), value: String(said[k].value), from: 'said' });
   return { fixed: f.fixed, now: now2 };

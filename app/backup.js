@@ -206,19 +206,23 @@ async function writeHim(root, n, all, core){
   const at = () => core && core.now ? core.now().getTime() : Date.now();
   const note = state => enc.encode(JSON.stringify({ v: 1, writer: 'modu', state, at: at() }));
   let one = null;
-  try { one = root.writeFolder ? await root.writeFolder(n, Object.assign({ [SAVING]: note('saved') }, all)) : null; }
+  try { one = root.writeFolder ? await root.writeFolder(n, Object.assign({ [SAVING]: note('saved') }, all), { saving: { file: SAVING, text: note('saving') } }) : null; }
   catch(e){ if (plainWrite(e).code === 'storage-full') throw e; console.error('one write refused, file by file:', e); try { await root.removeEntry(n, { recursive:true }); } catch {} }
   if (one) return one;
   const dir = await root.getDirectoryHandle(n, { create:true });
   await write(dir, SAVING, note('saving'));
-  for (const [p, b] of Object.entries(all)) await write(dir, p, b);
+  for (const [p, b] of Object.entries(all)){
+    try { await write(dir, p, b); }
+    catch(e){ try { e.file = p; e.size = b.byteLength; } catch {} throw e; }
+  }
   await write(dir, SAVING, note('saved'));
   return dir;
 }
+// a browser's DOMException has a number in .code; only our own words have a string there
 function plainWrite(e){
-  if (!e || e.code) return e;
-  if (e.name === 'QuotaExceededError' || /quota/i.test(e.message || '')) return Object.assign(new Error('手机的存储空间不够了，没有存上。清理一些空间后再试一次'), { code: 'storage-full', cause: e });
-  if (['AbortError', 'UnknownError', 'InvalidStateError', 'TransactionInactiveError'].includes(e.name)) return Object.assign(new Error('没有存上（这次保存被打断了），请再试一次'), { code: 'storage-lost', cause: e });
+  if (!e || typeof e.code === 'string') return e;
+  if (e.name === 'QuotaExceededError' || /quota/i.test(e.message || '')) return Object.assign(new Error('手机的存储空间不够了，没有存上。清理一些空间后再试一次'), { code: 'storage-full', cause: e, step: 'write' });
+  if (['AbortError', 'UnknownError', 'InvalidStateError', 'TransactionInactiveError'].includes(e.name)) return Object.assign(new Error('没有存上（这次保存被打断了），请再试一次'), { code: 'storage-lost', cause: e, step: 'write' });
   return e;
 }
 // Blob → his folder, written inside `root` (a picked folder, or core.phoneRoot()) as <name> or <name>-2…,

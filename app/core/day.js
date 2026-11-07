@@ -15,13 +15,13 @@ const { clone, now, isoDay, records } = core;
 // offered kind is handed to the apps that take it. `her` is her part of the day, from each app's today(day)
 // hook (and the event log), never by a model call. `mood` is the slot's mood word; `what` an
 // app's own short kind for a line of hers. A slot may carry `said` (his own words in chat
-// that set it: a plan he stated for that time), only when there are some. life.js also keeps `from` ('sketch' | 'skeleton'), `aged` (ms: told to
+// that set it: a plan he stated for that time) and `said_at` (when he said it), only when there are some. life.js also keeps `from` ('sketch' | 'skeleton'), `aged` (ms: told to
 // the memory source) and `line` (a skeleton day's one-liner); a reader keeps fields it does not know. The sketch,
 // the status, her part, the evening and the age-out are app/life.js's.
 const DAY_TYPE = 'day', DAY_ID = /^\d{4}-\d{2}-\d{2}$/;
 function dayShape(r){
   r = r && typeof r === 'object' ? r : {};
-  const slot = s => ({ at: Number(s.at) || 0, until: Number(s.until) || 0, where: String(s.where || ''), doing: String(s.doing || ''), why: String(s.why || ''), busy: s.busy === true, kind: String(s.kind || ''), mood: String(s.mood || ''), ...(s.said ? { said: String(s.said) } : {}) });
+  const slot = s => ({ at: Number(s.at) || 0, until: Number(s.until) || 0, where: String(s.where || ''), doing: String(s.doing || ''), why: String(s.why || ''), busy: s.busy === true, kind: String(s.kind || ''), mood: String(s.mood || ''), ...(s.said ? { said: String(s.said) } : {}), ...(s.said && Number(s.said_at) ? { said_at: Number(s.said_at) } : {}) });
   return Object.assign({}, r, { v: r.v || 1, day: String(r.day || r.id || ''), slots: [].concat(r.slots || []).filter(s => s && typeof s === 'object').map(slot).sort((a, b) => a.at - b.at),
     her: [].concat(r.her || []).filter(h => h && h.line).map(h => ({ at: Number(h.at) || 0, app: String(h.app || ''), line: String(h.line), what: String(h.what || '') })),
     entry: String(r.entry || ''), hints: [].concat(r.hints || []).filter(h => h && h.line) });

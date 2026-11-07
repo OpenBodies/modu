@@ -46,7 +46,7 @@ function statusAt(t){
   let s = null; try { s = dayStatus ? dayStatus(new Date(t)) : null; } catch { s = null; }
   if (!s) return '';
   if (s.presence === 'asleep') return 'asleep';
-  return [s.what || '', s.where ? `at ${s.where}` : '', s.busy ? '(busy, little time to talk)' : ''].filter(Boolean).join(' ');
+  return [s.inChat ? '' : s.what || '', s.where ? `at ${s.where}` : '', s.busy ? '(busy, little time to talk)' : ''].filter(Boolean).join(' ');
 }
 // what is still open from her side: open threads in his memory (memory-engine), and what she said she would do
 // in the last three days (her own words, before the memory job has read them)
@@ -98,9 +98,11 @@ function quietEnd(t){
   const b = quietRange()[1]; if (b == null) return t;
   const d = new Date(t); d.setHours(Math.floor(b / 60), b % 60, 0, 0); let e = d.getTime(); if (e <= t) e += DAY; return e;
 }
-// her cap: her own number (setHer, a ceiling over every knob), or his knob; each end of initiative.per_day too
+// her cap: the number she picked in 设置 is the answer, whatever the default per_day says.
+// Until she picks: his knob, and each end of initiative.per_day
 function cap(){
   const r = loadReach(); if (r.on === false) return 0;
+  if (r.cap !== null && r.cap !== undefined && r.cap !== '' && Number.isFinite(Number(r.cap))) return Math.max(0, Math.floor(Number(r.cap)));
   const c = Number(knob('initiative.default_cap', 2)), pd = knob('initiative.per_day', null);
   const hi = Array.isArray(pd) && Number.isFinite(Number(pd[1])) ? Number(pd[1]) : Infinity;
   return Math.max(0, Math.min(Number.isFinite(c) ? c : 2, hi));

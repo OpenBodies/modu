@@ -69,6 +69,19 @@ import.new.nodesc = 写一句话介绍他
 #   en: Write one line about him
 # the default companion could not be put here at the first start (the reason after the colon)
 import.first.fail = 默认联系人没能放进来，可以导入角色卡或新建一个。原因：{why}
+first.again = 再试一次
+first.fail.title = 默认联系人没能放进来
+# a save that failed: the one line to copy, and where it goes
+diag.copy = 复制这行出错记录
+diag.copied = 已复制，发给我们就能查原因
+diag.hold = 复制不了，可以长按这行选中
+save.fail.title = 没有存上
+open.fail.title = 没能打开{name}
+# this place cannot keep what she brings (core storageCheck: why)
+storage.title = 这里现在存不住东西
+storage.no-indexeddb = 这里不能保存，联系人和聊天关掉页面就没了。换一个上网的 App 打开吧
+storage.writes = 这里现在写不进东西，导入和聊天都可能存不上。换一个上网的 App 打开，或者清理一下手机再试
+storage.big-writes = 这里存得下小东西，存不下图片，带图的角色卡可能导入失败。换一个上网的 App 打开会更稳
 #   en: The default companion could not be added; bring a card or make one. Reason: {why}
 import.start = 开始聊天
 import.open = 打开已保存的角色文件夹
@@ -167,6 +180,13 @@ home.days = 在一起第 {n} 天
 # the 他 widget when nobody is in 聊天 (everyone deleted)
 home.nobody = 还没有联系人
 home.nobody.sub = 点击添加联系人
+# nobody open, for a reason other than nobody being here
+home.closed = 还没有打开联系人
+home.closed.sub = 去聊天里点一个
+home.unread = 现在读不出联系人
+home.unread.sub = 资料还在，关掉页面重新打开试试
+home.first.fail = 默认联系人没能放进来
+home.first.fail.sub = 正在再试，也可以去搬家导入
 # a screen that is his (聊天, 记忆, his apps), opened while nobody is here yet
 nobody.line = 这里还没有联系人。去搬家导入角色卡，或者新建一个，就可以用了。
 #   en: Nobody is here yet. Bring a card or make one in Move in, then this opens.
@@ -206,6 +226,8 @@ cal.demo.what2 = 书店
 chats.title = 聊天
 chats.add = 添加
 chats.empty = 还没有联系人\n点击「添加联系人」，导入联系人信息
+chats.unread = 现在读不出联系人\n资料还在，关掉页面重新打开试试
+chats.missing = 资料不在这部手机上了
 chats.add.row = 添加联系人
 # 删除联系人: a long press on a contact, or 聊天 ⋯ → 删除联系人. {name} = who is being deleted.
 chats.delete = 删除联系人
@@ -265,6 +287,7 @@ memory.toast.deleted = 已删除
 memory.toast.working = 正在整理…
 memory.toast.done = 整理了 {n} 条
 memory.toast.none = 没有新条目
+memory.toast.unread = 模型写回来的看不懂，这次没有记下。再试一次，或者换个模型
 memory.toast.failed = 整理失败：
 # shown at the top of 记忆 until 整理 is done
 memory.job.working = 正在整理…
@@ -1213,6 +1236,8 @@ app.peek.songs = 歌单
 app.peek.chats = 聊天
 app.peek.inner = 心声：{inner}
 app.peek.toast.fail = 没打开，可以再试一次
+app.peek.why.nokey = 还没有填好模型和 API key：到设置里填好再来。
+app.peek.why.timeout = 等了两分钟，模型还没有回音。再试一次，或者换个模型。
 
 # ===== app: call =====
 # 通话: the dock's screen (最近通话, 联系人) and the call card in the chat. {len} = 03:12; {q} = her first words
@@ -1404,6 +1429,8 @@ import.saved.away = {name}搬好了，在「聊天」里
 import.twin.title = 已经有一个{name}了
 import.twin.text = 替换：新的{name}搬进来以后，旧的{name}和你们的聊天记录、记忆会从这台设备上删除，无法恢复。都留着：会有两个{name}。
 import.twin.replace = 替换（删除旧的，无法恢复）
+import.twin.goes = 会被替换的是这一个
+import.twin.goes.many = 你有{n}个同名的，会被替换的是这一个
 import.twin.text.folder = 替换：新的{name}搬进来以后，旧的{name}从列表中移除，他的资料还在电脑上，之后可以在搬家里接回来。都留着：会有两个{name}。
 import.twin.replace.folder = 替换（旧的从列表中移除）
 import.twin.both = 都留着

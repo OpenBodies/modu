@@ -50,7 +50,13 @@ function dayOff(day){
   return (7 - wd) % 7 < n;   // Sunday 0, Saturday 1, Friday 2, …
 }
 // a place's name from his params' places (a block says place: 'work'), else the word as it is
-function placeName(id){ const p = [].concat(knob('places', []) || []).find(x => x && (x.id === id || x.name === id)); return p ? String(p.name || p.id) : String(id || ''); }
+function placeName(id){ if (ownWork()) return ''; const p = [].concat(knob('places', []) || []).find(x => x && (x.id === id || x.name === id)); return p ? String(p.name || p.id) : String(id || ''); }
+// most people bring their own cards, so Modu's 上班 decides little: when his work stretches are Modu's
+// defaults (no params beside his card and no calibration that worked), they keep his rhythm (busy hours, slower replies) but
+// name no job and no place: "上班 at 工作的地方" made a novelist's card talk about 收工 at noon. What he does in those
+// hours is his card's to say.
+const ownWork = () => { try { return !!(M.params && M.params.source && M.params.source('work.blocks') === 'default'); } catch { return false; } };
+const workWord = w => ownWork() ? 'busy with your own things' : w.label && w.label !== '在忙' ? w.label : String(knob('work.kind', '') || 'work');
 // → { day, wake, sleep, busy:[[from, to]], work:[{ from, to, place, label, share }], off, posts:[{ id, at }], diary } (ms).
 // Same name + day + params → same plan.
 function plan(day, name){
@@ -177,10 +183,14 @@ function clock(t){ const d = new Date(t); return `It is ${WEEK[d.getDay()]} ${is
 // 暂停 (the switch in 设置 → 他找你): while it is on, no side call at all. The core's paused() reads it;
 // a core without it: her settings (pause, or reach.pause) or the knob reach.pause; absent = off.
 function paused(){
+  if (dayLead() === 'off') return true;   // lead.day 'off': his life makes no call and writes nothing
   try { if (can('paused') && M.paused()) return true; } catch {}
   try { const s = M.loadSettings() || {}; if (s.pause === true || (s.reach && s.reach.pause === true)) return true; } catch {}
   return knob('reach.pause', false) === true;
 }
+// who leads his day (core lead(), settings.lead.day), and whether a record's slots are another planner's
+const dayLead = () => { try { return can('lead') ? M.lead('day') : 'modu'; } catch { return 'modu'; } };
+const otherPlanner = r => !!r && Array.isArray(r.slots) && r.slots.length > 0 && (r.from ? !['sketch', 'skeleton'].includes(r.from) : !!r.writer && r.writer !== 'life');
 const isPaused = e => !!e && (e.code === 'paused' || String(e.message) === 'paused');
 // every call of his life goes through the core's one counted door, sideCall(name, messages, { chat?, max }):
 // the side model for the sketch, the chat model for words in his own voice (posts, his diary, his answers).
@@ -253,7 +263,20 @@ function knob(n, f){ try { return can('param') ? M.param(n, f) : f; } catch { re
 // skeleton one-liner with no call; the days leaving the window go to the memory source as one batch.
 const SKETCH_TRIES = 3, SKETCH_BACKOFF = 10 * MIN, GAP_DAYS = 60;
 const lang = () => { const l = M.chatLanguage ? M.chatLanguage(M.store.msgs || []) : ''; return l === 'en' ? 'English' : l === 'other' ? 'the language this chat is written in' : 'Chinese'; };
-const slotsText = slots => (slots || []).map(s => `- ${hhmm(s.at)}${s.until ? '–' + hhmm(s.until) : ''} ${s.where ? s.where + ': ' : ''}${s.doing}${s.why ? ` (${s.why})` : ''}${s.said ? ' (as you told her in chat)' : ''}`).join('\n');
+const slotsText = (slots, point) => (slots || []).map(s => `- ${hhmm(s.at)}${s.until ? '–' + hhmm(s.until) : ''} ${s.where ? s.where + ': ' : ''}${point && inChat(s) ? `what you told her in chat${s.said_at ? ` at ${hhmm(s.said_at)}` : ''} (it is in the chat above)` : `${s.doing}${s.why ? ` (${s.why})` : ''}${s.said ? ' (as you told her in chat)' : ''}`}`).join('\n');
+// the echo loop: a slot set from his own chat line (heard, promised) while that line is still in the chat the model
+// reads is not quoted back to him: his chat prompt points at it, today and the days before (point;
+// the sketch and the evening, which read no chat window, keep his words). Quoted in "Right now" and in his day, his line was in one prompt
+// two or three times, and he said it again in each reply (a model repeats what its context repeats). Once the line has left
+// the chat window his words come back, as before. Other systems keep the same rule: memory carries what has left the
+// context (SillyTavern's summary and its vectors' kept-back last messages), never a second copy of what is still in it.
+const chatWindow = () => { try { return Math.max(1, Number(M.loadSettings().window) || 40); } catch { return 40; } };
+function inChat(s){
+  if (!s || !s.said) return false;   // an older slot has no said_at: its words are looked for in his messages
+  const msgs = M.store.msgs || [], n = chatWindow();
+  for (let i = msgs.length - 1, k = 0; i >= 0 && k < n; i--){ const m = msgs[i]; if (m.is_system) continue; k++; const d = M.msgDate(m); if (!m.is_user && (s.said_at ? d && Math.abs(d.getTime() - s.said_at) < 2000 : plain(m.mes).includes(s.said.slice(0, 16)))) return true; }
+  return false;
+}
 const hintsText = rec => ((rec && rec.hints) || []).map(h => `- ${h.line}`).join('\n');
 const herText = (rec, upTo) => ((rec && rec.her) || []).filter(h => !upTo || h.at <= upTo).map(h => `- ${hhmm(h.at)} ${h.line}`).join('\n');
 // the slots of a day as they may be seen at t (never one that has not begun)
@@ -261,14 +284,14 @@ async function seen(day, t){ if (!can('day')) return []; const r = await M.day.g
 // the frame in words: wake (and, for one who sleeps by day, since when), his work stretches (or the old busy ones), sleep
 function skeletonText(p){
   const base = dayStart(p.day), prev = plan(iso(base - 12 * HOUR)).sleep, later = t => t >= base + DAY ? (new Date(t).getHours() < 12 && t >= base + DAY + 4 * HOUR ? ' the next morning' : ' (after midnight)') : '';
-  const work = (p.work || []).map(w => `${w.label && w.label !== '在忙' ? w.label : 'work'} ${hhmm(w.from)}–${hhmm(w.to)}${later(w.to)}${w.place ? ' at ' + w.place : ''} (busy about ${Math.round(w.share * 10) * 10}% of it)`);
+  const work = (p.work || []).map(w => `${ownWork() ? workWord(w) : w.label && w.label !== '在忙' ? w.label : 'work'} ${hhmm(w.from)}–${hhmm(w.to)}${later(w.to)}${w.place ? ' at ' + w.place : ''} (busy about ${Math.round(w.share * 10) * 10}% of it)`);
   return [`wake ${hhmm(p.wake)}${prev > base + 4 * HOUR ? ` (asleep by day, since ${hhmm(prev)})` : ''}`]
     .concat(work.length ? work : p.busy.map(([a, b]) => `busy ${hhmm(a)}–${hhmm(b)}`), p.off ? ['a day off'] : [], [`sleep ${hhmm(p.sleep)}${later(p.sleep)}`]).join(', ');
 }
 // what is still ahead of him today, by his skeleton (his plans: never a sketched slot that has not begun): → words or ''
 function aheadText(t){
   const p = plan(iso(t)), out = [];
-  for (const w of p.work || []) if (w.to > t) out.push(`${w.label && w.label !== '在忙' ? w.label : String(knob('work.kind', '') || 'work')} ${w.from > t ? hhmm(w.from) : 'until'}${w.from > t ? '–' : ' '}${hhmm(w.to)}${w.place ? ' at ' + w.place : ''}`);
+  for (const w of p.work || []) if (w.to > t) out.push(`${workWord(w)} ${w.from > t ? hhmm(w.from) : 'until'}${w.from > t ? '–' : ' '}${hhmm(w.to)}${w.place ? ' at ' + w.place : ''}`);
   if (p.wake > t) out.unshift(`get up around ${hhmm(p.wake)}`);
   if (p.sleep > t) out.push(`bed around ${hhmm(p.sleep)}`);
   return out.join('; ');
@@ -327,7 +350,7 @@ async function catchUpWork(t, st){
   const have = await keptOf('post'), wrote = await keptOf('journal'), skipped = new Set(st.skipped || []);
   for (let k = WINDOW_DAYS - 1; k >= 0; k--){
     const day = iso(t - k * DAY); if (day < sinceDay) continue;
-    const rec = await M.day.get(day), p = plan(day), w = { day, plan: p, rec, sketch: !planned(rec), entry: false, posts: [] };
+    const rec = await M.day.get(day), p = plan(day), w = { day, plan: p, rec, sketch: !planned(rec) && dayLead() === 'modu', entry: false, posts: [] };
     if (day !== today || w.sketch){
       if (p.diary <= t && p.diary > st.since && !wrote.has(day) && !(rec && rec.caught)) w.entry = true;
       w.posts = p.posts.filter(x => x.at <= t && x.at > st.since + GRACE && !have.has(x.id) && !skipped.has(x.id));
@@ -359,7 +382,7 @@ async function settingText(first){
   const out = [], places = [].concat(knob('places', []) || []).filter(x => x && x.name);
   const home = places.filter(x => x.kind === 'home').map(x => x.name); if (home.length) out.push(`- You live at: ${home.join(', ')}`);
   const wk = String(knob('work.kind', '') || ''), blocks = [].concat(knob('work.blocks', []) || []).filter(b => b && b.from && b.to);
-  if (wk || blocks.length) out.push(`- Your work: ${[wk, blocks.map(b => `${b.from}–${b.to}${b.place ? ' at ' + placeName(b.place) : ''}`).join(', ')].filter(Boolean).join(', ')} (${Number(knob('work.days_off_per_week', 2)) || 0} days off a week)`);
+  if ((wk || blocks.length) && !ownWork()) out.push(`- Your work: ${[wk, blocks.map(b => `${b.from}–${b.to}${b.place ? ' at ' + placeName(b.place) : ''}`).join(', ')].filter(Boolean).join(', ')} (${Number(knob('work.days_off_per_week', 2)) || 0} days off a week)`);
   let cs = null; try { cs = can('currentState') ? M.currentState() : null; } catch {}
   if (cs){ for (const f of cs.fixed || []) out.push(`- ${f}`); for (const n of cs.now || []) out.push(`- ${n.key}: ${n.value}${n.from === 'said' ? ' (as you said it)' : ''}`); }
   const entries = [];
@@ -387,7 +410,7 @@ async function catchUp(t, st){
   for (const w of work) if (w.sketch){ let h = []; try { h = can('state') ? M.state.undertow(w.day) : []; } catch {} w.hints = h.map(x => ({ key: x.key, line: x.line })); w.hints.forEach(x => hints.push(`- ${w.day}: ${x.line}`)); }
   const her = [];
   for (const w of work){ const r = await M.day.get(w.day), l = herText(r); if (l) her.push(`${w.day}:\n${l}`); const talk = chatBefore(Math.min(t, dayStart(w.day) + DAY), 20, w.day); if (w.entry && talk) her.push(`${w.day}, in chat:\n${talk.slice(-3000)}`); }
-  const places = [].concat(knob('places', []) || []).map(x => x && (x.name || x.id)).filter(Boolean).map(x => `- ${x}`)
+  const places = [].concat(knob('places', []) || []).filter(x => x && !(ownWork() && x.kind === 'work')).map(x => x && (x.name || x.id)).filter(Boolean).map(x => `- ${x}`)
     .concat(offers().filter(o => o.kind !== 'post' && o.kind !== 'journal').map(o => `- ${o.words} [${o.kind}]`));
   const extra = work.map(w => [w.entry ? 'entry' + (herNote(w.day, today) ? ` (${herNote(w.day, today)})` : '') : '', w.posts.length ? `posts at ${w.posts.map(x => hhmm(x.at)).join(', ')}` : ''].filter(Boolean).join('; ')).map((x, i) => x ? `- ${days[i]}: ${x}` : '').filter(Boolean);
   const pr = M.pronouns ? M.pronouns() : { zh: '他', en: 'he/him' }, d0 = new Date(dayStart(today) + 12 * HOUR);
@@ -514,9 +537,10 @@ async function deeds(t, st){
 }
 // a reply's [promise: …] tag rewrites his next slot that has not begun: he does what he said
 // (a promise that names a time of day today goes to that time's slot, like a plan he said in chat, below)
-async function promised(text){
+async function promised(text, said_at){
   const t = M.now().getTime(), day = iso(t), at = timeIn(text, day);
-  if (isFinite(at) && at > t) return setSlot(at, text);
+  if (isFinite(at) && at > t) return setSlot(at, text, { said_at, by: BY.test(text) });
+  if (await notOurs(day)) return keepSaid(t, text, said_at);
   return writeDay(day, x => {
     const i = x.slots.findIndex(s => s.at > t); if (i < 0) return false;
     x.slots = x.slots.slice(); x.slots[i] = Object.assign({}, x.slots[i], { doing: plain(text).slice(0, 40), why: plain(text).slice(0, 60), kind: '', busy: false });
@@ -541,16 +565,33 @@ function timeIn(text, day){
   return isFinite(mins) && mins < 1440 ? dayStart(day) + mins * MIN : NaN;
 }
 // the slot at `at` becomes what he said (split off when it falls well inside a longer slot; a new one when none is there)
-async function setSlot(at, words){
-  const said = plain(words).slice(0, 80), doing = said.slice(0, 40);
+// a day another planner made stays theirs. What he says goes beside it, in life/said-<day>.json ({ lines: [{ at,
+// line, said_at }] }), never into their slots: their record, its writer and its rev are left alone, and their agent can read
+// the file and decide. The same when their agent leads his days (lead.day 'theirs'), written yet or not.
+const notOurs = async day => dayLead() !== 'modu' || otherPlanner(await M.day.get(day));
+async function keepSaid(at, words, said_at){
+  const day = iso(at), id = `said-${day}`; let r = null; try { r = await M.records.get('life', id); } catch {}
+  const lines = ((r && r.lines) || []).concat({ at, line: plain(words).slice(0, 80), said_at: said_at || M.now().getTime() });
+  await M.records.put('life', Object.assign({}, r, { id, lines }), { app: 'life' });
+  saidOn[day] = lines; return lines;
+}
+// o.said_at: when his message was sent (the prompt points at it while it is in the chat); o.by: the time is a deadline
+// (之前, before), so the stretch runs from his message until then and ends there, never on into the hours after
+async function setSlot(at, words, o = {}){
+  if (await notOurs(iso(at))) return keepSaid(at, words, o.said_at);
+  const said = plain(words).slice(0, 80), doing = said.slice(0, 40), end = at;
+  if (o.by && o.said_at && o.said_at < at) at = o.said_at;
   return writeDay(iso(at), x => {
     x.slots = x.slots.slice();
-    const mine = { at, where: '', doing, why: '', busy: false, kind: '', said };
+    const mine = Object.assign({ at, where: '', doing, why: '', busy: false, kind: '', said }, o.said_at ? { said_at: o.said_at } : {});
     const i = x.slots.findIndex(s => s.at <= at && (!s.until || at < s.until));
     if (i >= 0){
       const s = x.slots[i];
       if (at - s.at >= 30 * MIN){ x.slots[i] = Object.assign({}, s, { until: at }); x.slots.splice(i + 1, 0, Object.assign({}, s, mine)); }
       else x.slots[i] = Object.assign({}, s, mine, { at: s.at });
+      // a deadline ends his stretch there, never later (his next plan still begins when it begins): what the slot held
+      // before carries on after it
+      if (o.by && (s.until || 0) > end + 15 * MIN){ const k = x.slots.findIndex(y => y.said === said); if (k >= 0){ x.slots[k] = Object.assign({}, x.slots[k], { until: end }); x.slots.splice(k + 1, 0, Object.assign({}, s, { at: end })); } }
     } else {
       const j = x.slots.findIndex(s => s.at > at);
       x.slots.splice(j < 0 ? x.slots.length : j, 0, Object.assign({ until: j < 0 ? at + HOUR : x.slots[j].at, mood: '' }, mine));
@@ -559,6 +600,8 @@ async function setSlot(at, words){
 }
 // what is not a plan: a greeting (下午好, 晚上好, good morning), the past (中午吃了面, 刚才, already;
 // unless a plan word says it is still ahead: 要, 会, 打算, 待会, I'll), and a time with nothing to do in it (两点)
+// a deadline: 之前 / 以前, or English before / by <a time> ("by the river" is a place, not a deadline)
+const BY = /之前|以前|\bbefore\b|\bby\s+(\d|noon|midnight|tonight|then|the time)/i;
 const GREET = /(早上|早晨|上午|中午|下午|晚上|午)好|早安|晚安|good (morning|afternoon|evening|night)/i;
 const PAST = /(吃|做|去|买|看|睡|洗|喝|到|回|完|忙)了|过了|刚才|刚刚|已经|\b(had|did|was|went|ate|finished)\b/i;
 const AHEAD = /要|会|打算|准备|待会|一会|等下|等会|约了|\b(will|going to|gonna|plan)\b|i'll/i;
@@ -578,19 +621,20 @@ async function heard(msg){
   for (const line of String(msg.mes || '').replace(/\*[^*\n]*\*/g, '').split(/\n+/)){
     const l = plain(line.replace(/\[[^\]]*\]/g, '')); if (!l || n >= 2 || !isPlan(l)) continue;
     const at = timeIn(l, today); if (!isFinite(at) || at < t - 15 * MIN) continue;
-    await setSlot(at, l); n++;
+    await setSlot(at, l, { said_at: d.getTime(), by: BY.test(l) }); n++;
   }
   return n;
 }
 
 // --- the window, for his prompt and his status (kept in step with the records) ---------------------------------
-let days = {}, daysFor = '', daysAt = '';
+let days = {}, daysFor = '', daysAt = '', saidOn = {};
 function cacheDay(r){ if (r && r.day && daysFor === who()) days[r.day] = r; }
 async function readDays(){
   if (!who() || !can('day')) { days = {}; return; }
   const t = M.now().getTime(), key = who(), next = {};
-  for (let k = 0; k < WINDOW_DAYS; k++){ const d = iso(t - k * DAY), r = await M.day.get(d); if (r) next[d] = r; }
-  if (key === who()){ days = next; daysFor = key; daysAt = iso(t); }
+  const said = {};
+  for (let k = 0; k < WINDOW_DAYS; k++){ const d = iso(t - k * DAY), r = await M.day.get(d); if (r) next[d] = r; let s = null; try { s = await M.records.get('life', `said-${d}`); } catch {} if (s && s.lines) said[d] = s.lines; }
+  if (key === who()){ days = next; daysFor = key; daysAt = iso(t); saidOn = said; }
 }
 // the copy follows the date: once the day turns (the clock's beat, or her message), it is read again
 function daysFresh(){ if (who() && can('day') && (daysFor !== who() || daysAt !== iso(M.now().getTime()))) return readDays().then(() => M.updatePresence && M.updatePresence()).catch(() => {}); return null; }
@@ -623,7 +667,7 @@ function status(t){
   // the slot he is in: today's record, else last night's (a night worker at 02:00 is still in yesterday's day)
   const presence = doing(t), slotIn = r => r ? M.day.slotAt(M.day.visible(r, t), t) : null, s0 = slotIn(days[iso(t)]) || slotIn(days[iso(t - DAY)]);
   const sleeps = !!s0 && SLEEPS.test(s0.doing), slot = s0 && (presence === 'asleep' ? sleeps : !sleeps && !(s0.busy && presence === 'here')) ? s0 : null;
-  return { presence, where: slot ? slot.where : '', busy: presence === 'busy', what: slot ? slot.doing : '', since: slot ? slot.at : null, mood: moodNow(t, slot) };
+  return { presence, where: slot ? slot.where : '', busy: presence === 'busy', what: slot ? slot.doing : '', inChat: inChat(slot), since: slot ? slot.at : null, mood: moodNow(t, slot) };
 }
 // when he last got up (by his skeleton): today's wake, or yesterday's for one still up after midnight
 function lastWake(t){ const p = plan(iso(t)); return p.wake <= t ? p.wake : plan(iso(t - DAY)).wake; }
@@ -638,8 +682,11 @@ function todayText(t){
   const today = iso(t), up = lastWake(t), slots = [];
   for (const d of [iso(t - DAY), today]){ const r = days[d]; if (r) slots.push(...M.day.visible(r, t).slots.filter(s => s.at >= up - HOUR && s.at <= t)); }
   const rec = days[today], v = rec ? M.day.visible(rec, t) : null, asleep = (status(t) || {}).presence === 'asleep', ahead = aheadText(t), parts = [];
-  parts.push(slotsText(slots) || (up <= t && !asleep ? `- ${hhmm(up)} got up; nothing much yet` : ''));
+  parts.push(slotsText(slots, true) || (up <= t && !asleep ? `- ${hhmm(up)} got up; nothing much yet` : ''));
   if (v && herText(v, t)) parts.push(`With her today:\n${herText(v, t)}`);
+  // what he said beside another planner's day, once it has left the chat (while it is in the chat, the chat says it)
+  const told = (saidOn[today] || []).filter(l => !inChat({ said: l.line, said_at: l.said_at }));
+  if (told.length) parts.push(`You told her in chat:\n${told.map(l => `- ${hhmm(l.at)} ${l.line}`).join('\n')}`);
   if (v && v.entry && plan(today).diary <= t) parts.push(`Your diary tonight: ${v.entry}`);
   if (ahead) parts.push(`Still ahead today, as you planned it (it has not happened yet: never tell it as done): ${ahead}.`);
   const h = rec ? hintsText(rec) : '', body = parts.filter(Boolean);
@@ -655,12 +702,14 @@ function olderText(t){
   for (let k = WINDOW_DAYS - 1; k >= 1; k--){
     const day = iso(t - k * DAY), r = days[day]; if (!r) continue;
     const v = M.day.visible(r, t), head = k === 1 ? `Yesterday (${day})` : day;
-    const parts = [slotsText(v.slots) || (r.line ? `- ${r.line}` : ''), herText(v, t) ? `With her:\n${herText(v, t)}` : '', v.entry ? `Your diary that night: ${v.entry}` : ''].filter(Boolean);
+    const parts = [slotsText(v.slots, true) || (r.line ? `- ${r.line}` : ''), herText(v, t) ? `With her:\n${herText(v, t)}` : '', v.entry && !inLately(v.entry) ? `Your diary that night: ${v.entry}` : ''].filter(Boolean);
     if (parts.length) out.push(`${head}:\n${parts.join('\n')}`);
   }
   return out.length ? `Your own last days (you lived them; she knows only what you told her or did with her):\n${out.join('\n\n')}` : '';
 }
 // the whole window, as ModuLife.days(t) gives it: today, then the days before
+// his diary came twice in one prompt (here and in the life block, where his diary app tells it); once is enough
+function inLately(entry){ const k = plain(entry).slice(0, 24); return !!k && plain(lately).includes(k); }
 function daysText(t){ return [todayText(t), olderText(t)].filter(Boolean).join('\n\n'); }
 
 // --- his timed things, booked as jobs: the core's scheduler rings them; each runs as a wake ----------------------
@@ -864,7 +913,7 @@ M.on((ev, d) => { if (ev === 'message' && d && d.is_user) daysFresh(); });
 try { if (can('clock') && typeof M.clock.on === 'function') M.clock.on(() => { daysFresh(); }); } catch {}
 // his reply's [promise: …]: the next slot of his day becomes what he said
 
-M.on((ev, d) => { if (ev === 'message' && d && d.is_user === false && d.extra && Array.isArray(d.extra.modu_promises) && d.extra.modu_promises.length) promised(d.extra.modu_promises[0]).catch(() => {}); });
+M.on((ev, d) => { if (ev === 'message' && d && d.is_user === false && d.extra && Array.isArray(d.extra.modu_promises) && d.extra.modu_promises.length) promised(d.extra.modu_promises[0], M.msgDate(d) && M.msgDate(d).getTime()).catch(() => {}); });
 // a plan he states in chat, with a time later today: that slot becomes it (a reply with a promise tag is the promise's)
 M.on((ev, d) => { if (ev === 'message' && d && d.is_user === false && d.mes && v05() && !(d.extra && (d.extra.modu_reach || (Array.isArray(d.extra.modu_promises) && d.extra.modu_promises.length)))) heard(d).catch(() => {}); });
 // his reply in the chat: he has seen what is waiting for him on 朋友圈

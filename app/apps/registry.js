@@ -75,6 +75,9 @@ function open(id, el, ctx){
 }
 function close(id){ const u = unmounts.get(id); unmounts.delete(id); if (u) { try { u(); } catch(e){ console.error(`app ${id}:`, e); } } }
 
+// a draft build names its commit, so a browser never pairs a new page with old apps
+const build = document.querySelector('meta[name="modu-build"]');
+const fresh = build ? `?v=${encodeURIComponent(build.content)}` : '';
 // Load apps/index.json, then each app's app.js (and app.css if it says so). A missing or broken app is
 // skipped; the rest still load.
 function load(){
@@ -82,8 +85,8 @@ function load(){
     ids = Array.isArray(ids) ? ids.filter(x => typeof x === 'string') : [];
     for (const id of ids) if (!order.includes(id)) order.push(id);
     return Promise.all(ids.map(id => new Promise(res => {
-      const s = document.createElement('script'); s.src = `${base}${id}/app.js`;
-      s.onload = () => { const a = apps.get(id); if (a && a.css){ const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = `${base}${id}/app.css`; document.head.appendChild(l); } res(); };
+      const s = document.createElement('script'); s.src = `${base}${id}/app.js${fresh}`;
+      s.onload = () => { const a = apps.get(id); if (a && a.css){ const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = `${base}${id}/app.css${fresh}`; document.head.appendChild(l); } res(); };
       s.onerror = () => { console.error(`app ${id}: apps/${id}/app.js did not load`); res(); };
       document.head.appendChild(s);
     })));

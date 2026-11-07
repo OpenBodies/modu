@@ -29,6 +29,25 @@ function dropFinalStop(line){ const s = String(line == null ? '' : line), t = s.
 // model wrote; the chat shows it without (splitParts), and his past replies reach the prompt without, so the
 // history does not teach the 。 back.
 function chatStops(text){ return String(text == null ? '' : text).split('\n').map(l => /\*\s*$/.test(l) ? l : dropFinalStop(l)).join('\n'); }
+// Some models head his lines with his name, as in a script ("Alex(小明)" on a line of its own, or "小明：…"), most of all when
+// the card's name is long, and each one came out as a bubble of its own. → the text with those heads gone: a line that is
+// only his name (the card's whole name, or either half of "Alex(小明)"), when more follows, and a name with a colon in
+// front of a line. What he says about himself stays. For the screen and his prompt: his chat file keeps what the model wrote.
+const squeeze = s => String(s).replace(/\s+/g, '').replace(/（/g, '(').replace(/）/g, ')').toLowerCase();
+function nameForms(name){
+  const n = String(name || '').trim(), m = n.match(/^(.*?)\s*[(（]\s*(.*?)\s*[)）]\s*$/);
+  return [n].concat(m ? [m[1], m[2]] : []).map(squeeze).filter((x, i) => x.length >= 2 || (i === 0 && x));
+}
+function dropNames(text, name){
+  const forms = nameForms(name), t = String(text == null ? '' : text);
+  if (!forms.length) return t;
+  const lines = t.split('\n'), bare = l => squeeze(l).replace(/^[*【\[「]+|[*】\]」:：]+$/g, '');
+  const headed = l => { const s = l.replace(/^[\s*]+/, ''), c = s.search(/[:：]/); return c > 0 && forms.includes(bare(s.slice(0, c))) ? s.slice(c + 1).replace(/^[\s*]+/, '') : null; };
+  return lines.map((l, i) => {
+    if (forms.includes(bare(l)) && lines.slice(i + 1).some(x => x.trim())) return null;
+    const rest = headed(l); return rest ? rest : l;
+  }).filter(l => l !== null).join('\n');
+}
 // His reply as the chat shows it: [{ kind: 'say' | 'act', text }]. 'say' is a bubble (its final 。
 // dropped); 'act' is what he does (between asterisks, or （…）/(…) as a whole line; or a first line
 // that narrates him in the third person, "他刚收了碗。", when more lines follow), shown as a quiet line
@@ -37,7 +56,7 @@ function chatStops(text){ return String(text == null ? '' : text).split('\n').ma
 // ("他又迟到了。" about a colleague, followed by more lines) is read as narration.
 function splitParts(text, opts = {}){
   const out = [], name = String(opts.name || ''), pro = String(opts.pronoun || '');
-  const bubbles = splitBubbles(text);
+  const bubbles = splitBubbles(dropNames(text, name));
   bubbles.forEach((b, bi) => {
     if (/^[（(][^（）()]+[)）]$/.test(b)) { out.push({ kind:'act', text: b.slice(1, -1).trim() }); return; }
     for (const part of b.split(/(\*[^*]+\*)/)){
@@ -162,6 +181,6 @@ function parseReply(raw){
 // It reads through parseReply, so the other optional tags are cut from the text too.
 function splitEmotion(text){ const r = parseReply(text); return { text: r.text, emotion: r.emotion, labelled: r.labelled }; }
 
-Object.assign(core, { EMOTIONS, splitBubbles, dropFinalStop, chatStops, splitParts, tidyCJK, parseReply,
+Object.assign(core, { EMOTIONS, splitBubbles, dropFinalStop, chatStops, dropNames, splitParts, tidyCJK, parseReply,
   splitEmotion, photoTags });
 })(globalThis[Symbol.for('modu.core')]);
